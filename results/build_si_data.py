@@ -32,9 +32,9 @@ SI_STAT_BUILDERS = {
     "figS2_reference_all_test":   ("s2ref",  lambda c: B.sheet7().query("group == 'ALL test'").reset_index(drop=True)),
     # ── Supplementary Fig. S3: scenario coverage (same data as Fig. 4a) ───────
     "figS3_scenario_coverage":    ("s3cov",  lambda c: B.sheet_coverage()),
-    # ── Supplementary Fig. S4: 2100 distributions and total energy per case ───
+    # ── Supplementary Fig. S4: 2100 distributions and trajectories of all variables ──
     "figS4_box_quartiles_2100":   ("s4box",  lambda c: B.sheet_box_quartiles(c["gt_test"]).query("year == 2100").reset_index(drop=True)),
-    "figS4_total_trajectories":   ("s4tot",  lambda c: B.sheet_total_trajectories(c["gt_test"])),
+    "figS4_envelopes":            ("s4env",  lambda c: B.sheet_envelopes(c["gt_test"])),
     # ── numbers reported in the Supplementary tables and text ────────────────
     "consistency_checks": ("cons",   lambda c: B.sheet_constraints(c["gt_test"])),
     "cost_time":         ("cost",   lambda c: B.sheet6()),
@@ -75,7 +75,7 @@ SI_BUILDERS = {
     "figS2_reference_all_test":   ("figS2", lambda c: _s(c, "figS2_reference_all_test")[["mae", "smape_%"]]),
     "figS3_scenario_coverage":    ("figS3", figS3_coverage),
     "figS4_box_quartiles_2100":   ("figS4", lambda c: _s(c, "figS4_box_quartiles_2100").drop(columns=["year", "n_cases"])),
-    "figS4_total_trajectories":   ("figS4", lambda c: _s(c, "figS4_total_trajectories").drop(columns=["mean", "mae_of_total"])),
+    "figS4_envelopes":            ("figS4", lambda c: _s(c, "figS4_envelopes").drop(columns=["median_diff_syn_minus_ar6"])),
 }
 SI_TITLES = {   # block -> title row of its table in the workbook
     "figS1_knn_sweep":          "Supplementary Fig. S1a and b. Validation MAE of the KNN baseline for each k and α under uniform and similarity weights. The selected setting is marked.",
@@ -85,13 +85,13 @@ SI_TITLES = {   # block -> title row of its table in the workbook
     "figS2_reference_all_test": "Supplementary Fig. S2a and b. Test-set MAE and sMAPE over all cases, drawn as the dashed reference lines.",
     "figS3_scenario_coverage":  "Supplementary Fig. S3a and b. Number of scenarios for each design dimension and for each IAM family.",
     "figS4_box_quartiles_2100": "Supplementary Fig. S4a. Box statistics of the 2100 values of all 22 variables, for AR6 and synthetic trajectories. Values below 0.01 EJ yr⁻¹ were set to 0.01 EJ yr⁻¹.",
-    "figS4_total_trajectories": "Supplementary Fig. S4b and c. Median and quartiles of total primary energy and total final energy per case in each decade, for AR6 and synthetic trajectories (EJ yr⁻¹).",
+    "figS4_envelopes":          "Supplementary Fig. S4b. The 10th, 50th and 90th percentiles across test cases for each variable and year, for AR6 and synthetic trajectories (EJ yr⁻¹).",
 }
 SI_STAT_LAYOUT = {   # sheet -> [(block, where it is reported, description)]
     "FigS1": [("figS1_knn_sweep", "a, b", ""), ("figS1_cvae_sweep", "c", ""), ("figS1_ft9b_lr_val", "d", "")],
     "FigS2": [("figS2_region_metrics", "a, b", ""), ("figS2_reference_all_test", "a, b", "")],
     "FigS3": [("figS3_scenario_coverage", "a, b", "")],
-    "FigS4": [("figS4_box_quartiles_2100", "a", ""), ("figS4_total_trajectories", "b, c", "")],
+    "FigS4": [("figS4_box_quartiles_2100", "a", ""), ("figS4_envelopes", "b", "")],
     "Tables": [("consistency_checks", "Table S9", "sectoral consistency checks on the generated trajectories"),
                ("cost_time", "Table S10", "run time and cost per method"),
                ("neighbour_statistics", "Text S5", "neighbour availability in the retrieval step")],

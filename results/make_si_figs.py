@@ -7,7 +7,7 @@ helpers come from make_main_figs.py.
   figS1_hyperparam       hyper-parameter sweeps (KNN, cVAE, finetuned Qwen3.5-9B)
   figS2_region           per-region test accuracy of the finetuned model
   figS3_coverage         scenarios per design dimension and per IAM family
-  figS4_dist_totals      2100 distributions; total primary / final energy per case
+  figS4_dist_envelopes   2100 distributions; medians and percentile ranges of all 22 variables
 Usage:  python3 make_si_figs.py [S1 S2 S3 S4]
 """
 import sys
@@ -35,7 +35,7 @@ SI_BLOCKS = {
     "FigS1": ["figS1_knn_sweep", "figS1_cvae_sweep", "figS1_ft9b_lr_val"],
     "FigS2": ["figS2_region_metrics", "figS2_reference_all_test"],
     "FigS3": ["figS3_scenario_coverage"],
-    "FigS4": ["figS4_box_quartiles_2100", "figS4_total_trajectories"],
+    "FigS4": ["figS4_box_quartiles_2100", "figS4_envelopes"],
 }
 _NAMES[SI_XLSX] = SI_BLOCKS
 
@@ -210,15 +210,14 @@ def figS3():
 
 # ═══════════════════════ fig S4: 2100 distributions and total energy per case ══
 def figS4():
-    """a, AR6 vs synthetic
-    distributions in 2100 for all 22 variables; b-c, total primary
-    and total final energy per case over 2010-2100 (medians and IQR), AR6 vs
-    synthetic."""
-    bq = si_sheet("figS4_box_quartiles_2100"); tt = si_sheet("figS4_total_trajectories")
+    """a, AR6 vs synthetic distributions in 2100 for all 22 variables; b, medians
+    and 10th-90th percentile ranges across test cases over 2010-2100 for each
+    variable, AR6 vs synthetic."""
+    bq = si_sheet("figS4_box_quartiles_2100"); env = si_sheet("figS4_envelopes")
     PE = sorted(v for v in bq.variable.unique() if v.startswith("Primary")); FE = sorted(v for v in bq.variable.unique() if v.startswith("Final")); order_v = PE + FE
     xv = np.arange(len(order_v))
-    fig = plt.figure(figsize=(185 * MM, 112 * MM))
-    gs_a = fig.add_gridspec(1, 1, left=0.085, right=0.985, top=0.945, bottom=0.640)
+    fig = plt.figure(figsize=(185 * MM, 215 * MM))
+    gs_a = fig.add_gridspec(1, 1, left=0.085, right=0.985, top=0.965, bottom=0.815)
     ax = fig.add_subplot(gs_a[0, 0])
     for i, v in enumerate(order_v):
         for src, x_off, face, edge in (("AR6", -0.2, GOLD_L, AR6_C), ("synthetic", 0.2, TEALS[2], SYN)):
@@ -235,25 +234,28 @@ def figS4():
     ax.legend([Rectangle((0, 0), 1, 1, facecolor=GOLD_L, edgecolor=AR6_C, lw=0.6), Rectangle((0, 0), 1, 1, facecolor=TEALS[2], edgecolor=SYN, lw=0.6)],
               ["AR6", "Synthetic (Qwen3.5-9B)"], frameon=False, loc="upper left", ncol=2, fontsize=5.8, handlelength=1.2, columnspacing=1.4, borderaxespad=0.2)
     plabel(ax, "a", pad=0.065)
-    gs_b = fig.add_gridspec(1, 2, left=0.085, right=0.985, top=0.400, bottom=0.145, wspace=0.35)
-    for j, (name, title, yl, tks) in enumerate([("primary", "Total primary energy per case", (0, 130), [0, 60, 120]),
-                                                ("final", "Total final energy per case", (0, 95), [0, 45, 90])]):
-        ax = fig.add_subplot(gs_b[0, j])
-        dq = tt[tt.total.eq(name) & tt.source.eq("synthetic")].set_index("year").sort_index()
-        da = tt[tt.total.eq(name) & tt.source.eq("AR6")].set_index("year").sort_index()
-        ax.fill_between(dq.index, dq.q25, dq.q75, color=TEALS[1], alpha=0.6, lw=0, zorder=2)
-        ax.plot(dq.index, dq["median"], color=SYN, lw=2.0, zorder=5, solid_capstyle="round")
-        for q in ("q25", "q75"): ax.plot(da.index, da[q], color=AR6_C, lw=0.7, ls=(0, (2, 1.4)), zorder=4)
-        ax.plot(da.index, da["median"], color=AR6_C, lw=1.3, ls=(0, (2.4, 2.0)), zorder=6, solid_capstyle="butt")
-        ax.set_xlim(2008, 2102); ax.set_xticks([2010, 2050, 2100]); ax.set_ylim(*yl); set_yticks2(ax, tks, dec=0)
-        ax.set_xlabel("Year"); ax.set_ylabel("EJ yr$^{-1}$")
-        ax.text(0.03, 0.95, f"n = {int(dq.n_cases.iloc[0]):,} cases", transform=ax.transAxes, ha="left", va="top", fontsize=5.4, color=MUTED)
-        ax.set_title(title, pad=7, fontsize=7.5); plabel(ax, "bc"[j], pad=0.065 if j == 0 else 0.055)
-    hc = [plt.Line2D([], [], color=SYN, lw=2.0), Rectangle((0, 0), 1, 1, color=TEALS[1], alpha=0.6),
-          plt.Line2D([], [], color=AR6_C, lw=1.3, ls=(0, (2.4, 2.0))), plt.Line2D([], [], color=AR6_C, lw=0.7, ls=(0, (2, 1.4)))]
-    fig.legend(hc, ["Synthetic median", "Synthetic IQR", "AR6 median", "AR6 IQR (Q1, Q3)"], frameon=False, loc="upper center",
-               bbox_to_anchor=(0.54, 0.055), ncol=4, fontsize=6, handlelength=1.8, columnspacing=1.6)
-    save(fig, "figS4_dist_totals")
+    # b: one small panel per variable, primary energy above final energy
+    for g, (group, vars_, top, bottom) in enumerate((("Primary energy", PE, 0.672, 0.412), ("Final energy", FE, 0.332, 0.072))):
+        gs = fig.add_gridspec(2, 6, left=0.085, right=0.985, top=top, bottom=bottom, wspace=0.52, hspace=0.66)
+        n_cases = int(env[env.variable.eq(vars_[0])].n_cases.iloc[0]); assert env[env.variable.isin(vars_)].n_cases.eq(n_cases).all()
+        fig.text(0.085, top + 0.020, f"{group} (n = {n_cases:,} cases)", fontsize=6.6, color=MUTED, ha="left", va="bottom")
+        for i, v in enumerate(vars_):
+            ax = fig.add_subplot(gs[i // 6, i % 6]); e_ = env[env.variable.eq(v)].sort_values("year"); yrs = e_.year.to_numpy(int)
+            ax.fill_between(yrs, e_.syn_p10, e_.syn_p90, color=TEALS[1], alpha=0.55, lw=0, zorder=2)
+            ax.plot(yrs, e_.syn_median, color=SYN, lw=1.4, zorder=5)
+            for q in ("ar6_p10", "ar6_p90"): ax.plot(yrs, e_[q], color=AR6_C, lw=0.6, ls=(0, (2, 1.4)), zorder=4)
+            ax.plot(yrs, e_.ar6_median, color=AR6_C, lw=1.0, ls=(0, (2.6, 1.8)), zorder=6)
+            ax.set_ylim(0, max(float(max(e_.ar6_p90.max(), e_.syn_p90.max())) * 1.12, 0.05)); ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=3))
+            ax.set_xlim(2008, 2102); ax.set_xticks([2020, 2060, 2100]); ax.tick_params(labelsize=5.2, pad=1.5)
+            ax.set_title(_short_var(v), fontsize=6.0, pad=3, loc="left")
+            if i % 6 == 0: ax.set_ylabel("EJ yr$^{-1}$", fontsize=6, labelpad=2)
+            if g == 1 and i // 6 == 1: ax.set_xlabel("Year", fontsize=6, labelpad=1.5)
+            if g == 0 and i == 0: plabel(ax, "b", pad=0.065, yscale=1.42)
+    hB = [Rectangle((0, 0), 1, 1, color=TEALS[1], alpha=0.55), plt.Line2D([], [], color=SYN, lw=1.4),
+          plt.Line2D([], [], color=AR6_C, lw=0.6, ls=(0, (2, 1.4))), plt.Line2D([], [], color=AR6_C, lw=1.0, ls=(0, (2.6, 1.8)))]
+    fig.legend(hB, ["Synthetic, 10th–90th percentile", "Synthetic median", "AR6, 10th and 90th percentile", "AR6 median"], frameon=False,
+               loc="upper center", bbox_to_anchor=(0.54, 0.036), ncol=4, fontsize=5.8, handlelength=1.6, columnspacing=1.4)
+    save(fig, "figS4_dist_envelopes")
 
 
 if __name__ == "__main__":
