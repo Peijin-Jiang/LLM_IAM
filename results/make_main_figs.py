@@ -404,11 +404,11 @@ def fig3():
               columnspacing=1.2, borderaxespad=0.2)
     plabel(ax, "b", pad=0.065)
 
-    # c, d: extremum timing and maximum-value parity, in the same columns as the two panels of a
+    # c, d: extremum timing and maximum-value parity, with the same size and columns as the two panels of a
     # c: extremum timing
     et = sheet("fig3_extremum_timing").pivot(index="offset_years", columns="extremum", values="trajectories_%")
     offs = [-30, -20, -10, 0, 10, 20, 30]
-    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.085, right=0.385, top=0.365, bottom=0.079)[0, 0]); xo = np.arange(len(offs)); w = 0.38
+    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.085, right=0.385, top=0.365, bottom=0.185)[0, 0]); xo = np.arange(len(offs)); w = 0.38
     pk = [float(et.loc[k, "maximum"]) for k in offs]; tr = [float(et.loc[k, "minimum"]) for k in offs]
     ax.bar(xo - w / 2, pk, w, color=SYN, zorder=3, label="Maximum")
     ax.bar(xo + w / 2, tr, w, color=GOLD, zorder=3, label="Minimum")
@@ -427,10 +427,10 @@ def fig3():
     # d: maximum-value parity
     pk_ = sheet("fig3_maximum_parity"); gpk = pk_.ar6_maximum.to_numpy(float); ppk = pk_.synthetic_maximum.to_numpy(float)
     st = sheet("fig3_maximum_statistics").set_index("quantity").value
-    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.585, right=0.885, top=0.365, bottom=0.079)[0, 0]); hi_ = 150
+    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.585, right=0.885, top=0.365, bottom=0.185)[0, 0]); hi_ = 150
     ax.plot([0, hi_], [0, hi_], color=INK, lw=0.8, ls=(0, (3, 2)), zorder=6)
     ax.scatter(gpk, ppk, s=4, color=SYN, alpha=0.30, linewidths=0, zorder=3, rasterized=True)
-    ax.set_xlim(-3, hi_); ax.set_ylim(-3, hi_); ax.set_aspect("equal", adjustable="box")
+    ax.set_xlim(-3, hi_); ax.set_ylim(-3, hi_)
     for axis in (ax.xaxis, ax.yaxis):
         axis.set_major_locator(mticker.FixedLocator([0, 50, 100, 150])); axis.set_major_formatter(mticker.FixedFormatter(["0", "50", "100", "150"]))
     ax.set_xlabel("AR6 maximum (EJ yr$^{-1}$)"); ax.set_ylabel("Synthetic maximum (EJ yr$^{-1}$)", labelpad=1)
