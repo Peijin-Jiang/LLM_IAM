@@ -263,7 +263,7 @@ def fig2():
     ax.set_xticks(x); ax.set_xticklabels(["0", "1", "2", "3"])
     ax.set_xlabel("Different scenarios,\nsame IAM family ($k_s$)")
     ax.set_ylabel("MAE (EJ yr$^{-1}$)")
-    ax.set_title(f"Adding scenario neighbours\n(n = {n_val})", pad=7,
+    ax.set_title(f"Same-family neighbours\n(n = {n_val})", pad=7,
                  fontsize=TFS)
     plabel(ax, "a")
 
@@ -281,7 +281,7 @@ def fig2():
     ax.set_xticks(x); ax.set_xticklabels(["0", "1", "2", "3"])
     ax.set_xlabel("Different IAM families,\nsame scenario ($k_m$)")
     ax.set_ylabel("MAE (EJ yr$^{-1}$)")
-    ax.set_title(f"Adding model neighbours,\nscored where available (n = {int(ka.n_cases.iloc[0])})",
+    ax.set_title(f"Same-scenario neighbours,\nwhere available (n = {int(ka.n_cases.iloc[0])})",
                  pad=7, fontsize=TFS)
     plabel(ax, "b", pad=0.045)
 
@@ -297,7 +297,7 @@ def fig2():
     ax.set_xticklabels(["Full\nprompt", "w/o\nFP", "w/o scen.\ndesc.",
                         "w/o\nretrieval"], fontsize=6)
     ax.set_ylabel("MAE (EJ yr$^{-1}$)")
-    ax.set_title(f"Removing evidence sources\n(n = {n_val})", pad=7,
+    ax.set_title(f"Removing prompt components\n(n = {n_val})", pad=7,
                  fontsize=TFS)
     plabel(ax, "c", pad=0.045)
 
