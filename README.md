@@ -20,7 +20,9 @@ pip install -r requirements.txt
 Finetuning and inference run on a GPU (see the notebooks in `finetune/`). The extraction, reranking and zero-shot RAG steps call the OpenAI and Gemini APIs (`OPENAI_API_KEY`, `GEMINI_API_KEY`).
 
 ### 3. Data Availability
-The AR6 Scenarios Database is not redistributed here. It downloads the required data from IIASA (https://iiasa.ac.at/models-tools-data/ar6-scenario-explorer-and-database). 
+The AR6 Scenarios Database is not redistributed here. It downloads the required data from IIASA (https://iiasa.ac.at/models-tools-data/ar6-scenario-explorer-and-database).
+
+`outputs/` holds the test-set predictions of the four methods. These are synthetic trajectories, not output of the IAMs.
 
 ## Repository Structure
 
@@ -34,6 +36,7 @@ The AR6 Scenarios Database is not redistributed here. It downloads the required 
 | `finetune/` | Finetuning and inference of Qwen3.5-9B |
 | `knn/`, `cvae/` | Baseline models |
 | `classifier/` | Climate category classifiers |
+| `outputs/` | Test-set predictions of the four methods |
 | `results/` | Figure scripts and source data |
 
 The steps to reproduce the analysis are listed in `WORKFLOW.md`.
