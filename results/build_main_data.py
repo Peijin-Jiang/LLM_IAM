@@ -1276,9 +1276,9 @@ TRAJECTORY_GROUPS = [   # Fig. 3a: three groups of primary energy sources and th
 
 
 def sheet_group_trajectories(gt_test):
-    """Fig. 3a: per group, year and source the 10th / 50th / 90th percentiles
-    across test cases of the case-level sum of the variables of the group, AR6
-    vs Qwen3.5-9B. The three primary groups contain the 11 primary energy
+    """Fig. 3a: per group, year and source the mean and the 10th / 50th / 90th
+    percentiles across test cases of the case-level sum of the variables of the
+    group, AR6 vs Qwen3.5-9B. The three primary groups contain the 11 primary energy
     variables and the three sectors add up to total final energy. A case
     enters a group in a year only when every variable of the group is present
     in both AR6 and the prediction."""
@@ -1289,9 +1289,10 @@ def sheet_group_trajectories(gt_test):
             k = d[["id", f"{y}_ar6", f"{y}_syn"]].dropna(); cnt = k.groupby("id").size()
             tot = k[k.id.isin(cnt[cnt == len(members)].index)].groupby("id")[[f"{y}_ar6", f"{y}_syn"]].sum()
             for src, col in (("AR6", f"{y}_ar6"), ("synthetic", f"{y}_syn")):
-                q = np.percentile(tot[col].to_numpy(float), [10, 50, 90])
+                v = tot[col].to_numpy(float); q = np.percentile(v, [10, 50, 90])
                 rows.append({"energy": energy, "group": group, "source": src, "year": int(y), "n_cases": int(len(tot)),
-                             "p10": round(float(q[0]), 4), "median": round(float(q[1]), 4), "p90": round(float(q[2]), 4)})
+                             "mean": round(float(v.mean()), 4), "p10": round(float(q[0]), 4), "median": round(float(q[1]), 4),
+                             "p90": round(float(q[2]), 4)})
     return pd.DataFrame(rows)
 
 
@@ -1489,7 +1490,7 @@ STAT_LAYOUT = {   # sheet -> [(block, panels, description)]
              ("fig2_km_availability", "b", "validation MAE as the number of same-scenario neighbours k_m changes, by availability group"),
              ("fig2_test_four_methods", "d-g", "test-set MAE, sMAPE, Pearson r and Spearman rho of the four methods, bootstrap 95% CI")],
     "Fig3": [("fig3_test_trajectories", "c", "AR6 test truth (_ar6) and finetuned-model prediction (_syn) for every test trajectory, EJ/yr"),
-             ("fig3_group_trajectories", "a", "10th / 50th / 90th percentiles across test cases per group of variables, year and source"),
+             ("fig3_group_trajectories", "a", "mean and 10th / 50th / 90th percentiles across test cases per group of variables, year and source"),
              ("fig3_error_by_variable", "b", "MAE and sMAPE per variable, bootstrap 95% CI"),
              ("fig3_all_values", "c", "pooled statistics over all decadal values"),
              ("fig3_shape_fidelity", "d", "extremum-timing offsets and maximum-value statistics")],
@@ -1531,7 +1532,7 @@ def fig2_methods(c):
     return d[["method"] + [m + s for m in _METRICS4 for s in ("", "_ci2.5", "_ci97.5")]].reset_index(drop=True)
 
 def fig3_groups(c):
-    return _memo(c, "fig3_group_trajectories")
+    return _memo(c, "fig3_group_trajectories")[["energy", "group", "source", "year", "n_cases", "mean"]]
 
 def fig3_error(c):
     d = _memo(c, "fig3_error_by_variable"); d = d[d.method.eq(TEST_PREDS_QWEN)]
@@ -1628,7 +1629,7 @@ MAIN_TITLES = {   # block -> title row of its table in the workbook
     "fig2_rag_val_ablation":    "Fig. 2a and c. Validation MAE of the zero-shot RAG pipeline for each retrieval and prompt configuration, with bootstrap 95% confidence intervals.",
     "fig2_km_availability":     "Fig. 2b. Validation MAE for each number of same-scenario neighbours, scored on the cases for which such a neighbour is available, with bootstrap 95% confidence intervals.",
     "fig2_test_four_methods":   "Fig. 2d–g. Test-set MAE, sMAPE, Pearson r and Spearman ρ of the four methods, with bootstrap 95% confidence intervals.",
-    "fig3_group_trajectories":  "Fig. 3a. The 10th, 50th and 90th percentiles across test cases of each group of primary energy sources and each final energy sector in each decade, for AR6 and synthetic trajectories (EJ yr⁻¹).",
+    "fig3_group_trajectories":  "Fig. 3a. Mean across test cases of each group of primary energy sources and each final energy sector in each decade, for AR6 and synthetic trajectories (EJ yr⁻¹).",
     "fig3_error_by_variable":   "Fig. 3b. MAE and sMAPE of the finetuned model for each variable, with bootstrap 95% confidence intervals.",
     "fig3_value_density":       "Fig. 3c. Number of decadal values in each hexagonal bin. Bin centres are given as the base-10 logarithm of the value in EJ yr⁻¹ plus 0.01.",
     "fig3_value_density_grid":  "Fig. 3c. Hexagonal grid of the density panel.",

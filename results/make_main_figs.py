@@ -12,7 +12,7 @@ Colour rule: teal = synthetic (finetuned Qwen3.5-9B), gold = AR6, greys =
 baselines, other IAM families and references; in Fig. 4 gold also marks the
 lower-coverage / unseen strata.
   fig2_methods           RAG ablation (validation) + four-method test comparison
-  fig3_fidelity          grouped trajectories, error by variable, all-values density,
+  fig3_fidelity          stacked group means, error by variable, all-values density,
                          extremum timing (Qwen)
   fig4_generalisation    coverage matrix, test-set composition, metrics by stratum,
                          one-assumption examples
@@ -355,31 +355,29 @@ YEARS = [str(y) for y in range(2010, 2101, 10)]
 
 def fig3():
     fig = plt.figure(figsize=(185 * MM, 194 * MM))
-    # a: three groups of primary energy sources (left) and the three final energy sectors (right), in one row
-    gt_ = sheet("fig3_group_trajectories")
-    TITLES = {"Fossil fuels without CCS": "Fossil fuels\nwithout CCS", "Fossil fuels with CCS": "Fossil fuels\nwith CCS", "Non-fossil sources": "Non-fossil\nsources"}
-    for r, (energy, left, right) in enumerate((("primary", 0.085, 0.500), ("final", 0.570, 0.985))):
-        gs_a = fig.add_gridspec(1, 3, left=left, right=right, top=0.902, bottom=0.768, wspace=0.52)
-        groups = list(dict.fromkeys(gt_[gt_.energy.eq(energy)].group))
-        n_cases = int(gt_[gt_.energy.eq(energy)].n_cases.iloc[0]); assert gt_[gt_.energy.eq(energy)].n_cases.eq(n_cases).all()
-        fig.text(left, 0.951, f"{'Primary' if energy == 'primary' else 'Final'} energy (n = {n_cases:,} cases)", fontsize=6.6, color=MUTED, ha="left", va="bottom")
-        for i, g in enumerate(groups):
-            ax = fig.add_subplot(gs_a[0, i]); d_ = gt_[gt_.group.eq(g)]
-            dq = d_[d_.source.eq("synthetic")].set_index("year").sort_index(); da = d_[d_.source.eq("AR6")].set_index("year").sort_index()
-            ax.fill_between(da.index, da.p10, da.p90, color=GOLD_L, lw=0, zorder=2)                        # AR6: gold band and dashed median
-            ax.plot(da.index, da["median"], color=AR6_C, lw=1.3, ls=(0, (2.6, 1.8)), zorder=6)
-            for q in ("p10", "p90"): ax.plot(dq.index, dq[q], color=SYN, lw=0.7, zorder=4)                     # synthetic: teal lines
-            ax.plot(dq.index, dq["median"], color=SYN, lw=1.6, zorder=5)
-            ax.set_ylim(0, 1.12 * float(max(dq.p90.max(), da.p90.max()))); ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=3, integer=True))
-            ax.set_xlim(2008, 2102); ax.set_xticks([2020, 2060, 2100]); ax.tick_params(labelsize=5.6, pad=1.5)
-            ax.set_title(TITLES.get(g, g), fontsize=6.4, pad=3, loc="left", linespacing=1.1)
-            ax.set_xlabel("Year", fontsize=6.2, labelpad=1.5)
-            if i == 0: ax.set_ylabel("EJ yr$^{-1}$", fontsize=6.2, labelpad=2)
-            if r == 0 and i == 0: plabel(ax, "a", pad=0.065, yscale=1.55)
-    hA = [Rectangle((0, 0), 1, 1, color=GOLD_L), plt.Line2D([], [], color=AR6_C, lw=1.3, ls=(0, (2.6, 1.8))),
-          plt.Line2D([], [], color=SYN, lw=0.7), plt.Line2D([], [], color=SYN, lw=1.6)]
-    fig.legend(hA, ["AR6, 10th–90th percentile", "AR6 median", "Synthetic, 10th and 90th percentile", "Synthetic median"], frameon=False,
-               loc="upper center", bbox_to_anchor=(0.535, 0.712), ncol=4, fontsize=5.8, handlelength=1.6, columnspacing=1.3)
+    # a: mean energy per case, stacked by group: three groups of primary energy sources (left) and the three final
+    #    energy sectors (right). Areas = synthetic, dashed lines = AR6.
+    gt_ = sheet("fig3_group_trajectories"); SHADES = [TEALS[4], TEALS[2], TEALS[0]]
+    for r, (energy, title, left, right) in enumerate((("primary", "Primary energy", 0.085, 0.385), ("final", "Final energy", 0.585, 0.885))):
+        ax = fig.add_subplot(fig.add_gridspec(1, 1, left=left, right=right, top=0.925, bottom=0.745)[0, 0])
+        d_ = gt_[gt_.energy.eq(energy)]; groups = list(dict.fromkeys(d_.group))
+        n_cases = int(d_.n_cases.iloc[0]); assert d_.n_cases.eq(n_cases).all()
+        yrs = np.sort(d_.year.unique()); base_s = np.zeros(len(yrs)); base_a = np.zeros(len(yrs))
+        for g, shade in zip(groups, SHADES):
+            vs = d_[d_.group.eq(g) & d_.source.eq("synthetic")].set_index("year").loc[yrs, "mean"].to_numpy(float)
+            va = d_[d_.group.eq(g) & d_.source.eq("AR6")].set_index("year").loc[yrs, "mean"].to_numpy(float)
+            ax.fill_between(yrs, base_s, base_s + vs, facecolor=shade, edgecolor="white", lw=0.6, zorder=2)
+            ax.plot(yrs, base_a + va, color=AR6_C, lw=1.1, ls=(0, (2.6, 1.8)), zorder=5)
+            ax.text(2103, base_s[-1] + vs[-1] / 2, g, fontsize=5.8, ha="left", va="center", color=INK)
+            base_s, base_a = base_s + vs, base_a + va
+        ax.set_xlim(2010, 2100); ax.set_xticks([2010, 2050, 2100]); ax.set_ylim(0, 1.12 * float(max(base_s.max(), base_a.max())))
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=4, integer=True))
+        ax.set_xlabel("Year", labelpad=1.5); ax.set_ylabel("Mean per case (EJ yr$^{-1}$)")
+        ax.set_title(f"{title} (n = {n_cases:,} cases)", pad=6, fontsize=7.5)
+        if r == 0:
+            ax.legend([Rectangle((0, 0), 1, 1, facecolor=TEALS[2], edgecolor="white", lw=0.6), plt.Line2D([], [], color=AR6_C, lw=1.1, ls=(0, (2.6, 1.8)))],
+                      ["Synthetic (areas)", "AR6 (dashed lines)"], frameon=False, loc="upper left", fontsize=5.8, handlelength=1.6, labelspacing=0.35, borderaxespad=0.3)
+            plabel(ax, "a", pad=0.065)
 
     # b: per-variable MAE / sMAPE
     bv = sheet("fig3_error_by_variable").set_index("variable")
@@ -435,9 +433,9 @@ def fig3():
     ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.585, right=0.945, top=0.365, bottom=0.107)[0, 0]); xo = np.arange(len(offs)); w = 0.38
     pk = [float(et.loc[k, "maximum"]) for k in offs]; tr = [float(et.loc[k, "minimum"]) for k in offs]
     ax.bar(xo - w / 2, pk, w, color=SYN, zorder=3, label="Maximum")
-    ax.bar(xo + w / 2, tr, w, color=TEALS[1], zorder=3, label="Minimum")
+    ax.bar(xo + w / 2, tr, w, color=GOLD, zorder=3, label="Minimum")
     pk10, tr10 = sum(pk[2:5]), sum(tr[2:5])
-    for k, (val, col, lab) in enumerate(((pk10, SYN, "Max."), (tr10, "#5E9F8C", "Min."))):
+    for k, (val, col, lab) in enumerate(((pk10, SYN, "Max."), (tr10, AR6_C, "Min."))):
         yb = 102 + 15 * k
         ax.plot([xo[2] - w, xo[4] + w], [yb, yb], color=col, lw=0.7, zorder=4, clip_on=False)
         for xe_ in (xo[2] - w, xo[4] + w): ax.plot([xe_, xe_], [yb - 2.5, yb], color=col, lw=0.7, zorder=4)
