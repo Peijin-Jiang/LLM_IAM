@@ -421,7 +421,7 @@ def fig3():
     ax.set_xticks(xo); ax.set_xticklabels(["$\\leq$$-$30", "$-$20", "$-$10", "0", "+10", "+20", "$\\geq$+30"], fontsize=6.2)
     ax.set_xlim(-0.6, len(offs) - 0.4); ax.set_ylim(0, 137); set_yticks2(ax, [0, 25, 50, 75, 100], dec=0)
     ax.set_xlabel("Synthetic minus AR6 extremum year (yr)"); ax.set_ylabel("Trajectories (%)")
-    ax.legend(frameon=False, fontsize=5.8, loc="center left", bbox_to_anchor=(0.0, 0.52), handlelength=1.0, labelspacing=0.35, borderaxespad=0.2)
+    ax.legend(frameon=False, fontsize=5.8, loc="center left", bbox_to_anchor=(1.03, 0.5), handlelength=1.0, labelspacing=0.35, borderaxespad=0.0)   # right of the axes
     ax.set_title("Extremum timing", pad=8, fontsize=7.5); plabel(ax, "c", pad=0.065)
 
     # d: maximum-value parity
