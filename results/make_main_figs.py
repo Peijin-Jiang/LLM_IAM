@@ -12,8 +12,8 @@ Colour rule: teal = synthetic (finetuned Qwen3.5-9B), gold = AR6, greys =
 baselines, other IAM families and references; in Fig. 4 gold also marks the
 lower-coverage / unseen strata.
   fig2_methods           RAG ablation (validation) + four-method test comparison
-  fig3_fidelity          total energy per case, error by variable, 2050 distributions,
-                         all-values density, extremum timing, maximum parity (Qwen)
+  fig3_fidelity          grouped trajectories, error by variable, all-values density,
+                         extremum timing (Qwen)
   fig4_generalisation    coverage matrix, test-set composition, metrics by stratum,
                          one-assumption examples
   fig5_usecase           four held-out IAM family x scenario cells vs the other families
@@ -122,8 +122,8 @@ def save(fig, stem):
 # The data tables of each sheet, in their order on the sheet.
 MAIN_BLOCKS = {
     "Fig2": ["fig2_rag_val_ablation", "fig2_km_availability", "fig2_test_four_methods"],
-    "Fig3": ["fig3_total_trajectories", "fig3_error_by_variable", "fig3_box_quartiles_2050", "fig3_value_density",
-             "fig3_value_density_grid", "fig3_extremum_timing", "fig3_maximum_parity", "fig3_panel_statistics"],
+    "Fig3": ["fig3_group_trajectories", "fig3_error_by_variable", "fig3_value_density", "fig3_value_density_grid",
+             "fig3_extremum_timing"],
     "Fig4": ["fig4_scenario_coverage", "fig4_test_composition", "fig4_group_metrics", "fig4_reference_lines",
              "fig4_contrast_examples"],
     "Fig5": ["fig5_heldout_deviations"],
@@ -354,34 +354,37 @@ def box_stats(ax, x, lo, q1, med, q3, hi, face, edge, width=0.6, lw=0.7, z=3):
 YEARS = [str(y) for y in range(2010, 2101, 10)]
 
 def fig3():
-    fig = plt.figure(figsize=(185 * MM, 210 * MM))
-    # a: total primary and total final energy per case (medians and 10th-90th percentile ranges)
-    tt = sheet("fig3_total_trajectories")
-    gs_a = fig.add_gridspec(1, 2, left=0.085, right=0.985, top=0.962, bottom=0.829, wspace=0.30)
-    for j, (name, title, yl, tks) in enumerate([("primary", "Total primary energy per case", (0, 170), [0, 50, 100, 150]),
-                                                ("final", "Total final energy per case", (0, 130), [0, 40, 80, 120])]):
-        ax = fig.add_subplot(gs_a[0, j])
-        dq = tt[tt.total.eq(name) & tt.source.eq("synthetic")].set_index("year").sort_index()
-        da = tt[tt.total.eq(name) & tt.source.eq("AR6")].set_index("year").sort_index()
-        ax.fill_between(dq.index, dq.p10, dq.p90, color=TEALS[1], alpha=0.6, lw=0, zorder=2)
-        ax.plot(dq.index, dq["median"], color=SYN, lw=2.0, zorder=5, solid_capstyle="round")
-        for q in ("p10", "p90"): ax.plot(da.index, da[q], color=AR6_C, lw=0.7, ls=(0, (2, 1.4)), zorder=4)
-        ax.plot(da.index, da["median"], color=AR6_C, lw=1.3, ls=(0, (2.4, 2.0)), zorder=6, solid_capstyle="butt")
-        ax.set_xlim(2008, 2102); ax.set_xticks([2010, 2050, 2100]); ax.set_ylim(*yl); set_yticks2(ax, tks, dec=0)
-        ax.set_xlabel("Year", labelpad=1.5); ax.set_ylabel("EJ yr$^{-1}$")
-        ax.text(0.03, 0.95, f"n = {int(dq.n_cases.iloc[0]):,} cases", transform=ax.transAxes, ha="left", va="top", fontsize=5.4, color=MUTED)
-        ax.set_title(title, pad=7, fontsize=7.5)
-        if j == 0: plabel(ax, "a", pad=0.065)
-    hA = [Rectangle((0, 0), 1, 1, color=TEALS[1], alpha=0.6), plt.Line2D([], [], color=SYN, lw=2.0),
-          plt.Line2D([], [], color=AR6_C, lw=0.7, ls=(0, (2, 1.4))), plt.Line2D([], [], color=AR6_C, lw=1.3, ls=(0, (2.4, 2.0)))]
-    fig.legend(hA, ["Synthetic, 10th–90th percentile", "Synthetic median", "AR6, 10th and 90th percentile", "AR6 median"], frameon=False, loc="upper center",
-               bbox_to_anchor=(0.54, 0.771), ncol=4, fontsize=5.8, handlelength=1.8, columnspacing=1.6)
+    fig = plt.figure(figsize=(185 * MM, 203 * MM))
+    # a: three groups of primary energy sources (top row) and the three final energy sectors (bottom row)
+    gt_ = sheet("fig3_group_trajectories")
+    for r, (energy, top, bottom) in enumerate((("primary", 0.966, 0.848), ("final", 0.798, 0.680))):
+        gs_a = fig.add_gridspec(1, 3, left=0.085, right=0.985, top=top, bottom=bottom, wspace=0.42)
+        groups = list(dict.fromkeys(gt_[gt_.energy.eq(energy)].group))
+        for i, g in enumerate(groups):
+            ax = fig.add_subplot(gs_a[0, i]); d_ = gt_[gt_.group.eq(g)]
+            dq = d_[d_.source.eq("synthetic")].set_index("year").sort_index(); da = d_[d_.source.eq("AR6")].set_index("year").sort_index()
+            ax.fill_between(dq.index, dq.p10, dq.p90, color=TEALS[1], alpha=0.55, lw=0, zorder=2)
+            ax.plot(dq.index, dq["median"], color=SYN, lw=1.7, zorder=5)
+            for q in ("p10", "p90"): ax.plot(da.index, da[q], color=AR6_C, lw=0.7, ls=(0, (2, 1.4)), zorder=4)
+            ax.plot(da.index, da["median"], color=AR6_C, lw=1.2, ls=(0, (2.6, 1.8)), zorder=6)
+            ax.set_ylim(0, 1.12 * float(max(dq.p90.max(), da.p90.max()))); ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=4, integer=True))
+            ax.set_xlim(2008, 2102); ax.set_xticks([2010, 2050, 2100]); ax.tick_params(labelsize=6.2, pad=1.5)
+            ax.set_title(g, fontsize=6.8, pad=3, loc="left")
+            if i == 0:
+                ax.set_ylabel(("Primary" if energy == "primary" else "Final") + " energy\n(EJ yr$^{-1}$)", fontsize=6.4, labelpad=2, linespacing=1.15)
+                ax.text(1.0, 1.035, f"n = {int(dq.n_cases.iloc[0]):,} cases", transform=ax.transAxes, ha="right", va="bottom", fontsize=5.0, color=MUTED)
+            if r == 1: ax.set_xlabel("Year", fontsize=6.4, labelpad=1.5)
+            if r == 0 and i == 0: plabel(ax, "a", pad=0.065, yscale=1.20)
+    hA = [Rectangle((0, 0), 1, 1, color=TEALS[1], alpha=0.55), plt.Line2D([], [], color=SYN, lw=1.7),
+          plt.Line2D([], [], color=AR6_C, lw=0.7, ls=(0, (2, 1.4))), plt.Line2D([], [], color=AR6_C, lw=1.2, ls=(0, (2.6, 1.8)))]
+    fig.legend(hA, ["Synthetic, 10th–90th percentile", "Synthetic median", "AR6, 10th and 90th percentile", "AR6 median"], frameon=False,
+               loc="upper center", bbox_to_anchor=(0.54, 0.635), ncol=4, fontsize=5.8, handlelength=1.6, columnspacing=1.3)
 
-    # b: per-variable MAE / sMAPE, teal and grey (gold stays AR6-only)
+    # b: per-variable MAE / sMAPE
     bv = sheet("fig3_error_by_variable").set_index("variable")
     PE = sorted(v for v in bv.index if v.startswith("Primary")); FE = sorted(v for v in bv.index if v.startswith("Final")); order_v = PE + FE
     xv = np.arange(len(order_v))
-    gs_b = fig.add_gridspec(1, 1, left=0.085, right=0.945, top=0.719, bottom=0.624)
+    gs_b = fig.add_gridspec(1, 1, left=0.085, right=0.945, top=0.570, bottom=0.472)
     SLATE = "#4E5A66"
     ax = fig.add_subplot(gs_b[0, 0]); axr = ax.twinx()
     axr.spines["top"].set_visible(False); axr.spines["right"].set_visible(True); axr.spines["right"].set_color(SLATE)
@@ -395,35 +398,18 @@ def fig3():
     ax.axvline(len(PE) - 0.5, color=GRAY_L, lw=0.6, ls=(0, (3, 2)), zorder=0)
     for xc, txt in ((len(PE) / 2 - 0.5, "Primary energy"), (len(PE) + len(FE) / 2 - 0.5, "Final energy")):
         ax.text(xc, 1.0, txt, transform=ax.get_xaxis_transform(), ha="center", va="bottom", fontsize=6.2, color=MUTED)
-    ax.set_xlim(-0.7, len(order_v) - 0.3); ax.set_xticks(xv); ax.set_xticklabels([]); ax.tick_params(axis="x", length=0)
+    ax.set_xlim(-0.7, len(order_v) - 0.3); ax.set_xticks(xv)
+    ax.set_xticklabels([_short_var(v) for v in order_v], fontsize=5.4, rotation=32, ha="right", rotation_mode="anchor"); ax.tick_params(axis="x", length=0)
     ax.set_zorder(axr.get_zorder() + 1); ax.patch.set_visible(False)
     ax.legend([Rectangle((0, 0), 1, 1, color=TEALS[3]), plt.Line2D([], [], marker="o", ls="none", ms=3.4, mfc="white", mec=SLATE, mew=0.9)],
               ["MAE (left axis)", "sMAPE (right axis)"], frameon=False, fontsize=5.8, loc="upper left", ncol=2, handlelength=1.1,
               columnspacing=1.2, borderaxespad=0.2)
     plabel(ax, "b", pad=0.065)
 
-    # c: 2050 distributions, all 22 variables, AR6 (hollow gold) vs synthetic (teal)
-    bq = sheet("fig3_box_quartiles_2050")
-    gs_c = fig.add_gridspec(1, 1, left=0.085, right=0.945, top=0.562, bottom=0.444)
+    # c, d: all-values density parity and extremum timing
+    gs_c = fig.add_gridspec(1, 3, left=0.085, right=0.945, top=0.352, bottom=0.155, wspace=0, width_ratios=[1, 0.86, 1.72])   # column 1 is a spacer
+    # c: hexbin of all decadal values (log10(v + 0.01))
     ax = fig.add_subplot(gs_c[0, 0])
-    for i, v in enumerate(order_v):
-        for src, x_off, face, edge in (("AR6", -0.2, GOLD_L, AR6_C), ("synthetic", 0.2, TEALS[2], SYN)):
-            r_ = bq[bq.variable.eq(v) & bq.source.eq(src)].iloc[0]
-            box_stats(ax, i + x_off, max(r_.whisker_low, 0.01), max(r_.q1, 0.01), max(r_["median"], 0.01), max(r_.q3, 0.01),
-                      max(r_.whisker_high, 0.01), face, edge, width=0.34, lw=0.6)
-    ax.axvline(len(PE) - 0.5, color=GRAY_L, lw=0.6, ls=(0, (3, 2)), zorder=0)
-    ax.set_xlim(-0.7, len(order_v) - 0.3); ax.set_yscale("log"); ax.set_ylim(0.01, 3000)
-    ax.set_yticks([0.01, 1, 100]); ax.set_yticklabels(["0.01", "1", "100"]); ax.yaxis.set_minor_locator(mticker.NullLocator())
-    ax.set_ylabel("2050, EJ yr$^{-1}$ (log)"); ax.set_xticks(xv)
-    ax.set_xticklabels([_short_var(v) for v in order_v], fontsize=5.4, rotation=32, ha="right", rotation_mode="anchor"); ax.tick_params(axis="x", length=0)
-    ax.legend([Rectangle((0, 0), 1, 1, facecolor=GOLD_L, edgecolor=AR6_C, lw=0.6), Rectangle((0, 0), 1, 1, facecolor=TEALS[2], edgecolor=SYN, lw=0.6)],
-              ["AR6", "Synthetic (Qwen3.5-9B)"], frameon=False, loc="upper left", ncol=2, fontsize=5.8, handlelength=1.2, columnspacing=1.4, borderaxespad=0.2)
-    plabel(ax, "c", pad=0.065)
-
-    # d-f: all-values density parity, extremum timing, maximum-value parity
-    gs_d = fig.add_gridspec(1, 5, left=0.085, right=0.985, top=0.326, bottom=0.124, wspace=0, width_ratios=[1, 0.66, 1, 0.44, 1])   # columns 1 and 3 are spacers
-    # d: hexbin of all decadal values (log10(v + 0.01))
-    ax = fig.add_subplot(gs_d[0, 0])
     dn = sheet("fig3_value_density"); g_ = sheet("fig3_value_density_grid").iloc[0]
     f = lambda v: np.log10(np.clip(v, 0, None) + 0.01)
     hb = ax.hexbin(dn.ar6_log10, dn.synthetic_log10, C=dn.n_values, reduce_C_function=np.sum, gridsize=int(g_.gridsize),
@@ -441,12 +427,12 @@ def fig3():
     cax = ax.inset_axes([1.04, 0.0, 0.045, 1.0]); cb = fig.colorbar(hb, cax=cax); cb.ax.tick_params(labelsize=5.4, length=1.5, width=0.4)
     cb.set_ticks([1, 10, 100, 1000, 10000]); cb.set_ticklabels(["1", "10", "100", "1,000", "10,000"]); cb.ax.minorticks_off()
     cb.set_label("Number of values per bin", fontsize=5.8, labelpad=2); cb.outline.set_linewidth(0.4)
-    ax.set_title("All decadal values", pad=8, fontsize=7.5); plabel(ax, "d", pad=0.065)
+    ax.set_title("All decadal values", pad=8, fontsize=7.5); plabel(ax, "c", pad=0.065)
 
-    # e: extremum timing
+    # d: extremum timing
     et = sheet("fig3_extremum_timing").pivot(index="offset_years", columns="extremum", values="trajectories_%")
     offs = [-30, -20, -10, 0, 10, 20, 30]
-    ax = fig.add_subplot(gs_d[0, 2]); xo = np.arange(len(offs)); w = 0.38
+    ax = fig.add_subplot(gs_c[0, 2]); xo = np.arange(len(offs)); w = 0.38
     pk = [float(et.loc[k, "maximum"]) for k in offs]; tr = [float(et.loc[k, "minimum"]) for k in offs]
     ax.bar(xo - w / 2, pk, w, color=SYN, zorder=3, label="Maximum")
     ax.bar(xo + w / 2, tr, w, color=TEALS[1], zorder=3, label="Minimum")
@@ -456,27 +442,11 @@ def fig3():
         ax.plot([xo[2] - w, xo[4] + w], [yb, yb], color=col, lw=0.7, zorder=4, clip_on=False)
         for xe_ in (xo[2] - w, xo[4] + w): ax.plot([xe_, xe_], [yb - 2.5, yb], color=col, lw=0.7, zorder=4)
         ax.text(xo[3], yb + 1.5, f"{lab} {val:.0f}% within $\\pm$10 yr", ha="center", va="bottom", fontsize=5.4, color=col)
-    ax.set_xticks(xo); ax.set_xticklabels(["$\\leq$$-$30", "", "$-$10", "0", "+10", "", "$\\geq$+30"], fontsize=5.8)
+    ax.set_xticks(xo); ax.set_xticklabels(["$\\leq$$-$30", "$-$20", "$-$10", "0", "+10", "+20", "$\\geq$+30"], fontsize=6.2)
     ax.set_xlim(-0.6, len(offs) - 0.4); ax.set_ylim(0, 137); set_yticks2(ax, [0, 25, 50, 75, 100], dec=0)
-    ax.set_xlabel("Synthetic minus AR6\nextremum year (yr)", linespacing=1.15); ax.set_ylabel("Trajectories (%)")
-    ax.legend(frameon=False, fontsize=5.4, loc="center left", bbox_to_anchor=(0.0, 0.52), handlelength=1.0, labelspacing=0.35, borderaxespad=0.2)
-    ax.set_title("Extremum timing", pad=8, fontsize=7.5); plabel(ax, "e", pad=0.045)
-
-    # f: maximum-value parity
-    pk_ = sheet("fig3_maximum_parity"); gpk = pk_.ar6_maximum.to_numpy(float); ppk = pk_.synthetic_maximum.to_numpy(float)
-    ax = fig.add_subplot(gs_d[0, 4])
-    hi_ = 150
-    ax.plot([0, hi_], [0, hi_], color=INK, lw=0.8, ls=(0, (3, 2)), zorder=6)
-    ax.scatter(gpk, ppk, s=4, color=SYN, alpha=0.30, linewidths=0, zorder=3, rasterized=True)
-    ax.set_xlim(-3, hi_); ax.set_ylim(-3, hi_); ax.set_aspect("equal", adjustable="box")
-    for axis in (ax.xaxis, ax.yaxis):
-        axis.set_major_locator(mticker.FixedLocator([0, 50, 100, 150])); axis.set_major_formatter(mticker.FixedFormatter(["0", "50", "100", "150"]))
-    ax.set_xlabel("AR6 maximum (EJ yr$^{-1}$)"); ax.set_ylabel("Synthetic maximum (EJ yr$^{-1}$)", labelpad=1)
-    st = sheet("fig3_panel_statistics").set_index("quantity").value
-    r2 = float(st["maximum_r2"])
-    ax.text(0.04, 0.96, f"median rel. error {100 * float(st['maximum_median_relative_error']):.1f}%\n$R^2$ = {r2:.3f}", transform=ax.transAxes,
-            ha="left", va="top", fontsize=5.4, color=INK, linespacing=1.25)
-    ax.set_title("Maximum value", pad=8, fontsize=7.5); plabel(ax, "f", pad=0.045)
+    ax.set_xlabel("Synthetic minus AR6 extremum year (yr)"); ax.set_ylabel("Trajectories (%)")
+    ax.legend(frameon=False, fontsize=5.8, loc="center left", bbox_to_anchor=(0.0, 0.52), handlelength=1.0, labelspacing=0.35, borderaxespad=0.2)
+    ax.set_title("Extremum timing", pad=8, fontsize=7.5); plabel(ax, "d", pad=0.055)
     save(fig, "fig3_fidelity")
 
 # ══════════════════════════════════ fig 4: generalisation of Qwen3.5-9B ═════

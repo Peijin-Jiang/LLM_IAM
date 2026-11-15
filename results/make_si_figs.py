@@ -7,8 +7,10 @@ helpers come from make_main_figs.py.
   figS1_hyperparam       hyper-parameter sweeps (KNN, cVAE, finetuned Qwen3.5-9B)
   figS2_region           per-region test accuracy of the finetuned model
   figS3_coverage         scenarios per design dimension and per IAM family
-  figS4_dist_envelopes   2100 distributions; medians and percentile ranges of all 22 variables
-Usage:  python3 make_si_figs.py [S1 S2 S3 S4]
+  figS4_trajectories     medians and percentile ranges of all 22 variables over time
+  figS5_distributions    distributions of all 22 variables in 2050 and 2100
+  figS6_year_maximum     error of the four methods by year; maximum values
+Usage:  python3 make_si_figs.py [S1 S2 S3 S4 S5 S6]
 """
 import sys
 from pathlib import Path
@@ -23,7 +25,7 @@ from matplotlib.colors import LinearSegmentedColormap
 
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
-from make_main_figs import (TEALS, GOLD_L, GRAY_L, INK, MUTED, ROSE, AR6_C, SYN, CMAP_TEAL, MM, EKW,
+from make_main_figs import (TEALS, GOLD_L, GRAY_L, INK, MUTED, ROSE, AR6_C, SYN, CMAP_TEAL, MM, EKW, M_COLORS, M_LABELS,
                             set_yticks2, plabel, blabel, save, sheet, _NAMES, err, DIM_SHORT, REGION_SHORT, _short_var, box_stats)
 
 SI_XLSX = _HERE / "si_figure_data.xlsx"
@@ -35,7 +37,9 @@ SI_BLOCKS = {
     "FigS1": ["figS1_knn_sweep", "figS1_cvae_sweep", "figS1_ft9b_lr_val"],
     "FigS2": ["figS2_region_metrics", "figS2_reference_all_test"],
     "FigS3": ["figS3_scenario_coverage"],
-    "FigS4": ["figS4_box_quartiles_2100", "figS4_envelopes"],
+    "FigS4": ["figS4_envelopes"],
+    "FigS5": ["figS5_box_quartiles"],
+    "FigS6": ["figS6_error_by_year", "figS6_maximum_parity", "figS6_maximum_statistics"],
 }
 _NAMES[SI_XLSX] = SI_BLOCKS
 
@@ -210,35 +214,15 @@ def figS3():
 
 # ═══════════════════════ fig S4: 2100 distributions and total energy per case ══
 def figS4():
-    """a, AR6 vs synthetic distributions in 2100 for all 22 variables; b, medians
-    and 10th-90th percentile ranges across test cases over 2010-2100 for each
-    variable, AR6 vs synthetic."""
-    bq = si_sheet("figS4_box_quartiles_2100"); env = si_sheet("figS4_envelopes")
-    PE = sorted(v for v in bq.variable.unique() if v.startswith("Primary")); FE = sorted(v for v in bq.variable.unique() if v.startswith("Final")); order_v = PE + FE
-    xv = np.arange(len(order_v))
-    fig = plt.figure(figsize=(185 * MM, 215 * MM))
-    gs_a = fig.add_gridspec(1, 1, left=0.085, right=0.985, top=0.965, bottom=0.815)
-    ax = fig.add_subplot(gs_a[0, 0])
-    for i, v in enumerate(order_v):
-        for src, x_off, face, edge in (("AR6", -0.2, GOLD_L, AR6_C), ("synthetic", 0.2, TEALS[2], SYN)):
-            r_ = bq[bq.variable.eq(v) & bq.source.eq(src)].iloc[0]
-            box_stats(ax, i + x_off, max(r_.whisker_low, 0.01), max(r_.q1, 0.01), max(r_["median"], 0.01), max(r_.q3, 0.01),
-                      max(r_.whisker_high, 0.01), face, edge, width=0.34, lw=0.6)
-    ax.axvline(len(PE) - 0.5, color=GRAY_L, lw=0.6, ls=(0, (3, 2)), zorder=0)
-    for xc, txt in ((len(PE) / 2 - 0.5, "Primary energy"), (len(PE) + len(FE) / 2 - 0.5, "Final energy")):
-        ax.text(xc, 1.0, txt, transform=ax.get_xaxis_transform(), ha="center", va="bottom", fontsize=6.2, color=MUTED)
-    ax.set_xlim(-0.7, len(order_v) - 0.3); ax.set_yscale("log"); ax.set_ylim(0.01, 3000)
-    ax.set_yticks([0.01, 1, 100]); ax.set_yticklabels(["0.01", "1", "100"]); ax.yaxis.set_minor_locator(mticker.NullLocator())
-    ax.set_ylabel("2100, EJ yr$^{-1}$ (log)"); ax.set_xticks(xv)
-    ax.set_xticklabels([_short_var(v) for v in order_v], fontsize=5.4, rotation=32, ha="right", rotation_mode="anchor"); ax.tick_params(axis="x", length=0)
-    ax.legend([Rectangle((0, 0), 1, 1, facecolor=GOLD_L, edgecolor=AR6_C, lw=0.6), Rectangle((0, 0), 1, 1, facecolor=TEALS[2], edgecolor=SYN, lw=0.6)],
-              ["AR6", "Synthetic (Qwen3.5-9B)"], frameon=False, loc="upper left", ncol=2, fontsize=5.8, handlelength=1.2, columnspacing=1.4, borderaxespad=0.2)
-    plabel(ax, "a", pad=0.065)
-    # b: one small panel per variable, primary energy above final energy
-    for g, (group, vars_, top, bottom) in enumerate((("Primary energy", PE, 0.672, 0.412), ("Final energy", FE, 0.332, 0.072))):
+    """Medians and 10th-90th percentile ranges across test cases over 2010-2100
+    for each of the 22 variables, AR6 vs synthetic."""
+    env = si_sheet("figS4_envelopes")
+    PE = sorted(v for v in env.variable.unique() if v.startswith("Primary")); FE = sorted(v for v in env.variable.unique() if v.startswith("Final"))
+    fig = plt.figure(figsize=(185 * MM, 160 * MM))
+    for g, (group, vars_, top, bottom) in enumerate((("Primary energy", PE, 0.930, 0.580), ("Final energy", FE, 0.472, 0.122))):
         gs = fig.add_gridspec(2, 6, left=0.085, right=0.985, top=top, bottom=bottom, wspace=0.52, hspace=0.66)
         n_cases = int(env[env.variable.eq(vars_[0])].n_cases.iloc[0]); assert env[env.variable.isin(vars_)].n_cases.eq(n_cases).all()
-        fig.text(0.085, top + 0.020, f"{group} (n = {n_cases:,} cases)", fontsize=6.6, color=MUTED, ha="left", va="bottom")
+        fig.text(0.085, top + 0.027, f"{group} (n = {n_cases:,} cases)", fontsize=6.6, color=MUTED, ha="left", va="bottom")
         for i, v in enumerate(vars_):
             ax = fig.add_subplot(gs[i // 6, i % 6]); e_ = env[env.variable.eq(v)].sort_values("year"); yrs = e_.year.to_numpy(int)
             ax.fill_between(yrs, e_.syn_p10, e_.syn_p90, color=TEALS[1], alpha=0.55, lw=0, zorder=2)
@@ -250,16 +234,78 @@ def figS4():
             ax.set_title(_short_var(v), fontsize=6.0, pad=3, loc="left")
             if i % 6 == 0: ax.set_ylabel("EJ yr$^{-1}$", fontsize=6, labelpad=2)
             if g == 1 and i // 6 == 1: ax.set_xlabel("Year", fontsize=6, labelpad=1.5)
-            if g == 0 and i == 0: plabel(ax, "b", pad=0.065, yscale=1.42)
     hB = [Rectangle((0, 0), 1, 1, color=TEALS[1], alpha=0.55), plt.Line2D([], [], color=SYN, lw=1.4),
           plt.Line2D([], [], color=AR6_C, lw=0.6, ls=(0, (2, 1.4))), plt.Line2D([], [], color=AR6_C, lw=1.0, ls=(0, (2.6, 1.8)))]
     fig.legend(hB, ["Synthetic, 10th–90th percentile", "Synthetic median", "AR6, 10th and 90th percentile", "AR6 median"], frameon=False,
-               loc="upper center", bbox_to_anchor=(0.54, 0.036), ncol=4, fontsize=5.8, handlelength=1.6, columnspacing=1.4)
-    save(fig, "figS4_dist_envelopes")
+               loc="upper center", bbox_to_anchor=(0.54, 0.050), ncol=4, fontsize=5.8, handlelength=1.6, columnspacing=1.4)
+    save(fig, "figS4_trajectories")
+
+
+def figS5():
+    """AR6 vs synthetic distributions of all 22 variables in 2050 (a) and 2100 (b)."""
+    bq = si_sheet("figS5_box_quartiles")
+    PE = sorted(v for v in bq.variable.unique() if v.startswith("Primary")); FE = sorted(v for v in bq.variable.unique() if v.startswith("Final")); order_v = PE + FE
+    xv = np.arange(len(order_v))
+    fig = plt.figure(figsize=(185 * MM, 100 * MM))
+    for j, (year, top, bottom) in enumerate(((2050, 0.930, 0.640), (2100, 0.530, 0.240))):
+        ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.085, right=0.985, top=top, bottom=bottom)[0, 0])
+        for i, v in enumerate(order_v):
+            for src, x_off, face, edge in (("AR6", -0.2, GOLD_L, AR6_C), ("synthetic", 0.2, TEALS[2], SYN)):
+                r_ = bq[bq.variable.eq(v) & bq.source.eq(src) & bq.year.eq(year)].iloc[0]
+                box_stats(ax, i + x_off, max(r_.whisker_low, 0.01), max(r_.q1, 0.01), max(r_["median"], 0.01), max(r_.q3, 0.01),
+                          max(r_.whisker_high, 0.01), face, edge, width=0.34, lw=0.6)
+        ax.axvline(len(PE) - 0.5, color=GRAY_L, lw=0.6, ls=(0, (3, 2)), zorder=0)
+        ax.set_xlim(-0.7, len(order_v) - 0.3); ax.set_yscale("log"); ax.set_ylim(0.01, 3000)
+        ax.set_yticks([0.01, 1, 100]); ax.set_yticklabels(["0.01", "1", "100"]); ax.yaxis.set_minor_locator(mticker.NullLocator())
+        ax.set_ylabel(f"{year}, EJ yr$^{{-1}}$ (log)"); ax.set_xticks(xv); ax.tick_params(axis="x", length=0)
+        if j == 0:
+            for xc, txt in ((len(PE) / 2 - 0.5, "Primary energy"), (len(PE) + len(FE) / 2 - 0.5, "Final energy")):
+                ax.text(xc, 1.0, txt, transform=ax.get_xaxis_transform(), ha="center", va="bottom", fontsize=6.2, color=MUTED)
+            ax.set_xticklabels([])
+            ax.legend([Rectangle((0, 0), 1, 1, facecolor=GOLD_L, edgecolor=AR6_C, lw=0.6), Rectangle((0, 0), 1, 1, facecolor=TEALS[2], edgecolor=SYN, lw=0.6)],
+                      ["AR6", "Synthetic (Qwen3.5-9B)"], frameon=False, loc="upper left", ncol=2, fontsize=5.8, handlelength=1.2, columnspacing=1.4, borderaxespad=0.2)
+        else:
+            ax.set_xticklabels([_short_var(v) for v in order_v], fontsize=5.4, rotation=32, ha="right", rotation_mode="anchor")
+        plabel(ax, "ab"[j], pad=0.065)
+    save(fig, "figS5_distributions")
+
+
+def figS6():
+    """a, b, test-set MAE and sMAPE of the four methods in each year; c, maximum
+    value of each trajectory, AR6 vs synthetic."""
+    ey = si_sheet("figS6_error_by_year"); order = ["KNN", "cVAE", "RAG", "Qwen3.5-9B"]
+    fig = plt.figure(figsize=(185 * MM, 68 * MM))
+    gs = fig.add_gridspec(1, 3, left=0.075, right=0.985, top=0.870, bottom=0.300, wspace=0.42)
+    for j, (col, ylab, ymax, tks, dec) in enumerate((("mae", "MAE (EJ yr$^{-1}$)", 1.6, [0, 0.5, 1.0, 1.5], 1), ("smape_%", "sMAPE (%)", 38, [0, 10, 20, 30], 0))):
+        ax = fig.add_subplot(gs[0, j]); lo_c, hi_c = ("mae_ci2.5", "mae_ci97.5") if col == "mae" else ("smape_ci2.5", "smape_ci97.5")
+        for m in order:
+            d = ey[ey.method.eq(m)].sort_values("year"); x = d.year.to_numpy(int); y = d[col].to_numpy(float)
+            ax.fill_between(x, d[lo_c].to_numpy(float), d[hi_c].to_numpy(float), color=M_COLORS[m], alpha=0.25, lw=0, zorder=2)
+            ax.plot(x, y, color=M_COLORS[m], lw=1.6 if m == "Qwen3.5-9B" else 1.2, marker="o", ms=2.6, mfc=M_COLORS[m], mec="white", mew=0.5,
+                    zorder=5 if m == "Qwen3.5-9B" else 3)
+        ax.set_xlim(2005, 2105); ax.set_xticks([2010, 2040, 2070, 2100]); ax.set_ylim(0, ymax); set_yticks2(ax, tks, dec=dec)
+        ax.set_xlabel("Year"); ax.set_ylabel(ylab); plabel(ax, "ab"[j], pad=0.055 if j == 0 else 0.050)
+    handles = [plt.Line2D([], [], color=M_COLORS[m], lw=1.6, marker="o", ms=2.6, mec="white", mew=0.5) for m in order]
+    fig.legend(handles, [M_LABELS[m] for m in order], frameon=False, loc="upper center", bbox_to_anchor=(0.36, 0.115), ncol=4, fontsize=5.8,
+               handlelength=1.8, columnspacing=1.4)
+    # c: maximum-value parity
+    pk_ = si_sheet("figS6_maximum_parity"); gpk = pk_.ar6_maximum.to_numpy(float); ppk = pk_.synthetic_maximum.to_numpy(float)
+    st = si_sheet("figS6_maximum_statistics").set_index("quantity").value
+    ax = fig.add_subplot(gs[0, 2]); hi_ = 150
+    ax.plot([0, hi_], [0, hi_], color=INK, lw=0.8, ls=(0, (3, 2)), zorder=6)
+    ax.scatter(gpk, ppk, s=4, color=SYN, alpha=0.30, linewidths=0, zorder=3, rasterized=True)
+    ax.set_xlim(-3, hi_); ax.set_ylim(-3, hi_); ax.set_aspect("equal", adjustable="box")
+    for axis in (ax.xaxis, ax.yaxis):
+        axis.set_major_locator(mticker.FixedLocator([0, 50, 100, 150])); axis.set_major_formatter(mticker.FixedFormatter(["0", "50", "100", "150"]))
+    ax.set_xlabel("AR6 maximum (EJ yr$^{-1}$)"); ax.set_ylabel("Synthetic maximum (EJ yr$^{-1}$)", labelpad=1)
+    ax.text(0.04, 0.96, f"median rel. error {100 * float(st['maximum_median_relative_error']):.1f}%\n$R^2$ = {float(st['maximum_r2']):.3f}", transform=ax.transAxes,
+            ha="left", va="top", fontsize=5.4, color=INK, linespacing=1.25)
+    plabel(ax, "c", pad=0.050)
+    save(fig, "figS6_year_maximum")
 
 
 if __name__ == "__main__":
-    which = sys.argv[1:] or ["S1", "S2", "S3", "S4"]
+    which = sys.argv[1:] or ["S1", "S2", "S3", "S4", "S5", "S6"]
     for w in which:
-        {"S1": figS1, "S2": figS2, "S3": figS3, "S4": figS4}[w]()
+        {"S1": figS1, "S2": figS2, "S3": figS3, "S4": figS4, "S5": figS5, "S6": figS6}[w]()
     print("SI figures written to", _HERE)

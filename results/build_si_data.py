@@ -2,7 +2,7 @@
 build_si_data.py
 ────────────────
 Compute the data behind the Supplementary figures into si_figure_data.xlsx:
-one sheet per Supplementary figure (FigS1 .. FigS4), holding the data tables of
+one sheet per Supplementary figure (FigS1 .. FigS6), holding the data tables of
 that figure one below the other (title row, header, rows, then an empty row).
 A table holds exactly what the panel draws; make_si_figs.py plots the tables
 without further computation. Scoring code and the workbook writer come from
@@ -19,6 +19,7 @@ from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
+import pandas as pd
 import build_main_data as B
 
 # complete statistics per block; the figure blocks below are reduced from them
@@ -32,9 +33,14 @@ SI_STAT_BUILDERS = {
     "figS2_reference_all_test":   ("s2ref",  lambda c: B.sheet7().query("group == 'ALL test'").reset_index(drop=True)),
     # ── Supplementary Fig. S3: scenario coverage (same data as Fig. 4a) ───────
     "figS3_scenario_coverage":    ("s3cov",  lambda c: B.sheet_coverage()),
-    # ── Supplementary Fig. S4: 2100 distributions and trajectories of all variables ──
-    "figS4_box_quartiles_2100":   ("s4box",  lambda c: B.sheet_box_quartiles(c["gt_test"]).query("year == 2100").reset_index(drop=True)),
+    # ── Supplementary Fig. S4: trajectories of all 22 variables ──────────────
     "figS4_envelopes":            ("s4env",  lambda c: B.sheet_envelopes(c["gt_test"])),
+    # ── Supplementary Fig. S5: distributions in 2050 and 2100 ────────────────
+    "figS5_box_quartiles":        ("s5box",  lambda c: B.sheet_box_quartiles(c["gt_test"])),
+    # ── Supplementary Fig. S6: error by year and maximum values ──────────────
+    "figS6_error_by_year":        ("s6year", lambda c: B.sheet_error_by_year(c["gt_test"])),
+    "figS6_shape_fidelity":       ("s6max",  lambda c: B.sheet_shape_fidelity(c["gt_test"])),
+    "figS6_peak_height":          ("s6max",  lambda c: B.sheet_peak_height(c["gt_test"])),
     # ── numbers reported in the Supplementary tables and text ────────────────
     "consistency_checks": ("cons",   lambda c: B.sheet_constraints(c["gt_test"])),
     "cost_time":         ("cost",   lambda c: B.sheet6()),
@@ -67,6 +73,23 @@ def figS3_coverage(c):
     d = _s(c, "figS3_scenario_coverage")
     return d[d.level.isin(["dimension", "family"])][["level", "dimension", "model_family", "n_scenarios"]].reset_index(drop=True)
 
+METHOD_KEYS = {"KNN (cond1 k2 uniform a0.75)": "KNN", "cVAE (cond1 lr1e-4 hid2048)": "cVAE",
+               "RAG (topk210, gemini-3.5-flash-lite)": "RAG", "Finetune Qwen3.5-9B (lr5e-4)": "Qwen3.5-9B"}
+
+def figS6_year(c):
+    d = _s(c, "figS6_error_by_year").copy(); d["method"] = d.method.map(METHOD_KEYS)
+    return d[["method", "year", "mae", "mae_ci2.5", "mae_ci97.5", "smape_%", "smape_ci2.5", "smape_ci97.5"]]
+
+def figS6_maximum_parity(c):
+    """Panel c points: maximum of each test trajectory with a defined extremum, AR6 and synthetic."""
+    d = _s(c, "figS6_peak_height"); d = d[d.timing_eligible.eq(True)]
+    return pd.DataFrame({"ar6_maximum": d.ar6_peak_height.to_numpy(float), "synthetic_maximum": d.synthetic_peak_height.to_numpy(float)})
+
+def figS6_maximum_statistics(c):
+    d = _s(c, "figS6_shape_fidelity"); q = d[d.method.eq(B.TEST_PREDS_QWEN)].iloc[0]
+    return pd.DataFrame([{"quantity": "maximum_median_relative_error", "value": float(q.peak_value_rel_err_median)},
+                         {"quantity": "maximum_r2", "value": float(q.peak_height_r2)}])
+
 SI_BUILDERS = {
     "figS1_knn_sweep":            ("figS1", figS1_knn),
     "figS1_cvae_sweep":           ("figS1", figS1_cvae),
@@ -74,8 +97,11 @@ SI_BUILDERS = {
     "figS2_region_metrics":       ("figS2", lambda c: _s(c, "figS2_region_metrics")[["region", "mae", "smape_%"]]),
     "figS2_reference_all_test":   ("figS2", lambda c: _s(c, "figS2_reference_all_test")[["mae", "smape_%"]]),
     "figS3_scenario_coverage":    ("figS3", figS3_coverage),
-    "figS4_box_quartiles_2100":   ("figS4", lambda c: _s(c, "figS4_box_quartiles_2100").drop(columns=["year", "n_cases"])),
     "figS4_envelopes":            ("figS4", lambda c: _s(c, "figS4_envelopes").drop(columns=["median_diff_syn_minus_ar6"])),
+    "figS5_box_quartiles":        ("figS5", lambda c: _s(c, "figS5_box_quartiles").drop(columns=["n_cases"])),
+    "figS6_error_by_year":        ("figS6", figS6_year),
+    "figS6_maximum_parity":       ("figS6", figS6_maximum_parity),
+    "figS6_maximum_statistics":   ("figS6", figS6_maximum_statistics),
 }
 SI_TITLES = {   # block -> title row of its table in the workbook
     "figS1_knn_sweep":          "Supplementary Fig. S1a and b. Validation MAE of the KNN baseline for each k and α under uniform and similarity weights. The selected setting is marked.",
@@ -84,14 +110,19 @@ SI_TITLES = {   # block -> title row of its table in the workbook
     "figS2_region_metrics":     "Supplementary Fig. S2a and b. Test-set MAE and sMAPE of the finetuned model for each R10 region.",
     "figS2_reference_all_test": "Supplementary Fig. S2a and b. Test-set MAE and sMAPE over all cases, drawn as the dashed reference lines.",
     "figS3_scenario_coverage":  "Supplementary Fig. S3a and b. Number of scenarios for each design dimension and for each IAM family.",
-    "figS4_box_quartiles_2100": "Supplementary Fig. S4a. Box statistics of the 2100 values of all 22 variables, for AR6 and synthetic trajectories. Values below 0.01 EJ yr⁻¹ were set to 0.01 EJ yr⁻¹.",
-    "figS4_envelopes":          "Supplementary Fig. S4b. The 10th, 50th and 90th percentiles across test cases for each variable and year, for AR6 and synthetic trajectories (EJ yr⁻¹).",
+    "figS4_envelopes":          "Supplementary Fig. S4. The 10th, 50th and 90th percentiles across test cases for each variable and year, for AR6 and synthetic trajectories (EJ yr⁻¹).",
+    "figS5_box_quartiles":      "Supplementary Fig. S5a and b. Box statistics of the 2050 and 2100 values of all 22 variables, for AR6 and synthetic trajectories. Values below 0.01 EJ yr⁻¹ were set to 0.01 EJ yr⁻¹.",
+    "figS6_error_by_year":      "Supplementary Fig. S6a and b. Test-set MAE and sMAPE of the four methods in each year, with bootstrap 95% confidence intervals.",
+    "figS6_maximum_parity":     "Supplementary Fig. S6c. Maximum of each test trajectory with a defined extremum, for AR6 and synthetic trajectories (EJ yr⁻¹).",
+    "figS6_maximum_statistics": "Supplementary Fig. S6c. Numbers printed in the panel.",
 }
 SI_STAT_LAYOUT = {   # sheet -> [(block, where it is reported, description)]
     "FigS1": [("figS1_knn_sweep", "a, b", ""), ("figS1_cvae_sweep", "c", ""), ("figS1_ft9b_lr_val", "d", "")],
     "FigS2": [("figS2_region_metrics", "a, b", ""), ("figS2_reference_all_test", "a, b", "")],
     "FigS3": [("figS3_scenario_coverage", "a, b", "")],
-    "FigS4": [("figS4_box_quartiles_2100", "a", ""), ("figS4_envelopes", "b", "")],
+    "FigS4": [("figS4_envelopes", "", "")],
+    "FigS5": [("figS5_box_quartiles", "a, b", "")],
+    "FigS6": [("figS6_error_by_year", "a, b", ""), ("figS6_shape_fidelity", "c", ""), ("figS6_peak_height", "c", "")],
     "Tables": [("consistency_checks", "Table S9", "sectoral consistency checks on the generated trajectories"),
                ("cost_time", "Table S10", "run time and cost per method"),
                ("neighbour_statistics", "Text S5", "neighbour availability in the retrieval step")],

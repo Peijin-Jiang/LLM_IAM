@@ -1105,6 +1105,13 @@ def sheet_error_by_variable(gt_test):
     return out.sort_values(["method", "variable"]).reset_index(drop=True)
 
 
+def sheet_error_by_year(gt_test):
+    """Supplementary Fig. S6a,b: test-set error of the four methods in each
+    year (all variables pooled)."""
+    out = _boot_by(_pointwise(gt_test), "year")
+    return out.sort_values(["method", "year"]).reset_index(drop=True)
+
+
 def extremum_timing(truth, prediction, kind="maximum"):
     """Return minimum year distance between all exactly tied extrema.
 
@@ -1151,7 +1158,7 @@ def extremum_offset_weights(true_years, pred_years):
 
 
 def sheet_shape_fidelity(gt_test):
-    """Fig. 3e,f: extrema timing and maximum magnitude.
+    """Fig. 3d and Supplementary Fig. S6c: extrema timing and maximum magnitude.
 
     Timing is assessed on complete, nonconstant AR6 trajectories, including
     endpoint extrema and partial ties. Constant predictions are timing failures.
@@ -1257,52 +1264,34 @@ def sheet_shape_fidelity(gt_test):
     return pd.DataFrame(rows)
 
 
-PE_TOTAL_VARS = ["Primary Energy|Biomass", "Primary Energy|Coal|w/ CCS",
-                 "Primary Energy|Coal|w/o CCS", "Primary Energy|Gas|w/ CCS",
-                 "Primary Energy|Gas|w/o CCS", "Primary Energy|Hydro",
-                 "Primary Energy|Nuclear", "Primary Energy|Oil|w/ CCS",
-                 "Primary Energy|Oil|w/o CCS", "Primary Energy|Solar",
-                 "Primary Energy|Wind"]
-FE_TOTAL_VARS = ["Final Energy|Industry",
-                 "Final Energy|Residential and Commercial",
-                 "Final Energy|Transportation"]
+TRAJECTORY_GROUPS = [   # Fig. 3a: three groups of primary energy sources and the three final energy sectors
+    ("primary", "Fossil fuels without CCS", ["Primary Energy|Coal|w/o CCS", "Primary Energy|Gas|w/o CCS", "Primary Energy|Oil|w/o CCS"]),
+    ("primary", "Fossil fuels with CCS", ["Primary Energy|Coal|w/ CCS", "Primary Energy|Gas|w/ CCS", "Primary Energy|Oil|w/ CCS"]),
+    ("primary", "Non-fossil sources", ["Primary Energy|Biomass", "Primary Energy|Hydro", "Primary Energy|Nuclear",
+                                       "Primary Energy|Solar", "Primary Energy|Wind"]),
+    ("final", "Industry", ["Final Energy|Industry"]),
+    ("final", "Buildings", ["Final Energy|Residential and Commercial"]),
+    ("final", "Transport", ["Final Energy|Transportation"]),
+]
 
 
-def sheet_total_trajectories(gt_test):
-    """Fig. 3a: case-level totals over the decades, AR6 vs Qwen3.5-9B.
-    Primary total = sum of the 11 disjoint primary-energy sources; final
-    total = Industry + Residential&Commercial + Transportation (the three
-    disjoint sectors - the carrier and electricity variables overlap them,
-    so they are NOT added).  A case enters a total only when every member
-    variable is present in both GT and prediction for that year.  Rows give
-    the cross-case median / percentiles / mean of each total per year."""
-    pred = pd.read_csv(OUTS / TEST_PREDS["Finetune Qwen3.5-9B (lr5e-4)"])
-    pred.columns = [str(c).strip() for c in pred.columns]
-    rows = []
-    for name, members in (("primary", PE_TOTAL_VARS), ("final", FE_TOTAL_VARS)):
-        g = gt_test[gt_test.variable.isin(members)]
-        p = pred[pred.variable.isin(members)]
-        m = g[["id", "variable"] + YEARS].merge(
-            p[["id", "variable"] + YEARS], on=["id", "variable"],
-            how="inner", suffixes=("_t", "_p"))
+def sheet_group_trajectories(gt_test):
+    """Fig. 3a: per group, year and source the 10th / 50th / 90th percentiles
+    across test cases of the case-level sum of the variables of the group, AR6
+    vs Qwen3.5-9B. The three primary groups contain the 11 primary energy
+    variables and the three sectors add up to total final energy. A case
+    enters a group in a year only when every variable of the group is present
+    in both AR6 and the prediction."""
+    m = _test_pairs(gt_test); rows = []
+    for energy, group, members in TRAJECTORY_GROUPS:
+        d = m[m.variable.isin(members)]
         for y in YEARS:
-            k = m[["id", f"{y}_t", f"{y}_p"]].dropna()
-            cnt = k.groupby("id").size()
-            ok = cnt[cnt == len(members)].index
-            k = k[k.id.isin(ok)]
-            tot = k.groupby("id")[[f"{y}_t", f"{y}_p"]].sum()
-            for src, col in (("AR6", f"{y}_t"), ("synthetic", f"{y}_p")):
-                v = tot[col].to_numpy(float)
-                rows.append({"total": name, "source": src, "year": int(y),
-                             "n_cases": int(len(v)),
-                             "median": round(float(np.median(v)), 4),
-                             "p10": round(float(np.percentile(v, 10)), 4),
-                             "q25": round(float(np.percentile(v, 25)), 4),
-                             "q75": round(float(np.percentile(v, 75)), 4),
-                             "p90": round(float(np.percentile(v, 90)), 4),
-                             "mean": round(float(v.mean()), 4),
-                             "mae_of_total": round(float(np.abs(
-                                 tot[f"{y}_t"] - tot[f"{y}_p"]).mean()), 4)})
+            k = d[["id", f"{y}_ar6", f"{y}_syn"]].dropna(); cnt = k.groupby("id").size()
+            tot = k[k.id.isin(cnt[cnt == len(members)].index)].groupby("id")[[f"{y}_ar6", f"{y}_syn"]].sum()
+            for src, col in (("AR6", f"{y}_ar6"), ("synthetic", f"{y}_syn")):
+                q = np.percentile(tot[col].to_numpy(float), [10, 50, 90])
+                rows.append({"energy": energy, "group": group, "source": src, "year": int(y), "n_cases": int(len(tot)),
+                             "p10": round(float(q[0]), 4), "median": round(float(q[1]), 4), "p90": round(float(q[2]), 4)})
     return pd.DataFrame(rows)
 
 
@@ -1315,7 +1304,7 @@ def _qwen_pred():
 
 
 def sheet_box_quartiles(gt_test):
-    """Fig. 3c and Supplementary Fig. S4a: per variable, year (2050, 2100) and source (AR6 / synthetic),
+    """Supplementary Fig. S5: per variable, year (2050, 2100) and source (AR6 / synthetic),
     the box statistics drawn in the figure - Q1, median, Q3 and the whisker
     ends (last value inside 1.5 IQR) - on the same test cases (values below
     0.01 EJ/yr are clipped to 0.01 before the statistics, as in the plot)."""
@@ -1338,7 +1327,7 @@ def sheet_box_quartiles(gt_test):
 
 
 def sheet_peak_height(gt_test):
-    """Fig. 3e,f: maxima and all tied extremum years for every trajectory.
+    """Fig. 3d and Supplementary Fig. S6c: maxima and all tied extremum years for every trajectory.
 
     Columns named peak hold maxima, including endpoint maxima.
     The timing_eligible flag defines the shared sample for both panels.
@@ -1384,7 +1373,7 @@ def _test_pairs(gt_test):
     return m.reset_index(drop=True)
 
 def sheet_envelopes(gt_test):
-    """Supplementary Fig. S4b: per variable x year x source the 10th / 50th / 90th
+    """Supplementary Fig. S4: per variable x year x source the 10th / 50th / 90th
     percentiles across test cases, and the synthetic-minus-AR6 difference of the medians."""
     m = _test_pairs(gt_test); rows = []
     for v in sorted(m.variable.unique()):
@@ -1397,7 +1386,7 @@ def sheet_envelopes(gt_test):
     return pd.DataFrame(rows)
 
 def sheet_all_values(gt_test):
-    """Fig. 3d: pooled statistics over all 248,050 decadal values (24,805 trajectories x 10 decades)."""
+    """Fig. 3c: pooled statistics over all 248,050 decadal values (24,805 trajectories x 10 decades)."""
     m = _test_pairs(gt_test)
     xa = m[[f"{y}_ar6" for y in YEARS]].to_numpy(float).ravel(); xs = m[[f"{y}_syn" for y in YEARS]].to_numpy(float).ravel()
     e = np.abs(xs - xa)
@@ -1481,12 +1470,10 @@ STAT_BUILDERS = {
     "fig2_test_four_methods":     ("test",   lambda c: sheet5(c["gt_test"])),
     # ── Fig. 3: fidelity of the finetuned model ────────────────────────────
     "fig3_test_trajectories":     ("traj",   lambda c: _test_pairs(c["gt_test"])),
-    "fig3_total_trajectories":    ("tot",    lambda c: sheet_total_trajectories(c["gt_test"])),
+    "fig3_group_trajectories":    ("grp3",   lambda c: sheet_group_trajectories(c["gt_test"])),
     "fig3_error_by_variable":     ("byvar",  lambda c: sheet_error_by_variable(c["gt_test"])),
-    "fig3_box_quartiles_2050":    ("box",    lambda c: sheet_box_quartiles(c["gt_test"]).query("year == 2050").reset_index(drop=True)),
     "fig3_all_values":            ("allv",   lambda c: sheet_all_values(c["gt_test"])),
     "fig3_shape_fidelity":        ("shape",  lambda c: sheet_shape_fidelity(c["gt_test"])),
-    "fig3_peak_height":           ("peak",   lambda c: sheet_peak_height(c["gt_test"])),
     # ── Fig. 4: coverage, strata, one-assumption examples ──────────────────
     "fig4_scenario_coverage":     ("dist",   lambda c: sheet_coverage()),
     "fig4_group_metrics":         ("grp",    lambda c: sheet7()),
@@ -1501,13 +1488,11 @@ STAT_LAYOUT = {   # sheet -> [(block, panels, description)]
     "Fig2": [("fig2_rag_val_ablation", "a, c", "validation MAE of the zero-shot RAG pipeline per retrieval / prompt configuration, bootstrap 95% CI"),
              ("fig2_km_availability", "b", "validation MAE as the number of same-scenario neighbours k_m changes, by availability group"),
              ("fig2_test_four_methods", "d-g", "test-set MAE, sMAPE, Pearson r and Spearman rho of the four methods, bootstrap 95% CI")],
-    "Fig3": [("fig3_test_trajectories", "d", "AR6 test truth (_ar6) and finetuned-model prediction (_syn) for every test trajectory, EJ/yr"),
-             ("fig3_total_trajectories", "a", "median, percentiles and mean of total primary and total final energy per case, per year and source"),
+    "Fig3": [("fig3_test_trajectories", "c", "AR6 test truth (_ar6) and finetuned-model prediction (_syn) for every test trajectory, EJ/yr"),
+             ("fig3_group_trajectories", "a", "10th / 50th / 90th percentiles across test cases per group of variables, year and source"),
              ("fig3_error_by_variable", "b", "MAE and sMAPE per variable, bootstrap 95% CI"),
-             ("fig3_box_quartiles_2050", "c", "box statistics (Q1, median, Q3, whisker ends) per variable and source, 2050"),
-             ("fig3_all_values", "d", "pooled statistics over all decadal values"),
-             ("fig3_shape_fidelity", "e", "extremum-timing offsets and maximum-value statistics"),
-             ("fig3_peak_height", "f", "AR6 and synthetic maximum per trajectory, with timing eligibility")],
+             ("fig3_all_values", "c", "pooled statistics over all decadal values"),
+             ("fig3_shape_fidelity", "d", "extremum-timing offsets and maximum-value statistics")],
     "Fig4": [("fig4_scenario_coverage", "a", "scenarios per design dimension x IAM family, with coverage status"),
              ("fig4_group_metrics", "b-f", "test-set metrics and case counts per stratum"),
              ("fig4_nearest_desc_scenario", "c-f", "dotted reference: error of the description-nearest scenario of the same family and region"),
@@ -1545,20 +1530,17 @@ def fig2_methods(c):
     d = _memo(c, "fig2_test_four_methods")
     return d[["method"] + [m + s for m in _METRICS4 for s in ("", "_ci2.5", "_ci97.5")]].reset_index(drop=True)
 
-def fig3_totals(c):
-    return _memo(c, "fig3_total_trajectories")[["total", "source", "year", "n_cases", "p10", "median", "p90"]]
+def fig3_groups(c):
+    return _memo(c, "fig3_group_trajectories")
 
 def fig3_error(c):
     d = _memo(c, "fig3_error_by_variable"); d = d[d.method.eq(TEST_PREDS_QWEN)]
     return d[["variable", "mae", "mae_ci2.5", "mae_ci97.5", "smape_%", "smape_ci2.5", "smape_ci97.5"]].reset_index(drop=True)
 
-def fig3_boxes(c):
-    return _memo(c, "fig3_box_quartiles_2050").drop(columns=["year", "n_cases"])
-
 DENSITY_GRIDSIZE = 55
 
 def _value_density(c):
-    """Panel d: all decadal values of the test set, AR6 against synthetic, counted
+    """Panel c: all decadal values of the test set, AR6 against synthetic, counted
     on the hexagonal grid of the figure. Axes are log10(value + 0.01)."""
     if "_density" not in c:
         from matplotlib.figure import Figure
@@ -1581,21 +1563,6 @@ def fig3_extremum_timing(c):
     d = _memo(c, "fig3_shape_fidelity"); q = d[d.method.eq(TEST_PREDS_QWEN)].iloc[0]
     return pd.DataFrame([{"extremum": lab, "offset_years": k, "trajectories_%": float(q[f"{col}_offset_{k:+d}_%"])}
                          for lab, col in (("maximum", "peak"), ("minimum", "trough")) for k in TIMING_OFFSETS])
-
-def _maximum_points(c):
-    d = _memo(c, "fig3_peak_height"); d = d[d.timing_eligible.eq(True)]
-    return d.ar6_peak_height.to_numpy(float), d.synthetic_peak_height.to_numpy(float)
-
-def fig3_maximum_parity(c):
-    """Panel f points: maximum of each test trajectory with a defined extremum, AR6 and synthetic."""
-    a, s = _maximum_points(c)
-    return pd.DataFrame({"ar6_maximum": a, "synthetic_maximum": s})
-
-def fig3_panel_statistics(c):
-    d = _memo(c, "fig3_shape_fidelity"); q = d[d.method.eq(TEST_PREDS_QWEN)].iloc[0]
-    return pd.DataFrame([
-        {"panel": "f", "quantity": "maximum_median_relative_error", "value": float(q.peak_value_rel_err_median)},
-        {"panel": "f", "quantity": "maximum_r2", "value": float(q.peak_height_r2)}])
 
 GROUP_LABELS = {"ALL test": "All test", "Lower coverage: dimension x IAM family": "Lower coverage",
                 "Higher coverage: dimension x IAM family": "Higher coverage",
@@ -1645,14 +1612,11 @@ MAIN_BUILDERS = {
     "fig2_rag_val_ablation":    ("fig2", fig2_ablation),
     "fig2_km_availability":     ("fig2", fig2_km),
     "fig2_test_four_methods":   ("fig2", fig2_methods),
-    "fig3_total_trajectories":  ("fig3", fig3_totals),
+    "fig3_group_trajectories":  ("fig3", fig3_groups),
     "fig3_error_by_variable":   ("fig3", fig3_error),
-    "fig3_box_quartiles_2050":  ("fig3", fig3_boxes),
     "fig3_value_density":       ("fig3", lambda c: _value_density(c)[0]),
     "fig3_value_density_grid":  ("fig3", lambda c: _value_density(c)[1]),
     "fig3_extremum_timing":     ("fig3", fig3_extremum_timing),
-    "fig3_maximum_parity":      ("fig3", fig3_maximum_parity),
-    "fig3_panel_statistics":    ("fig3", fig3_panel_statistics),
     "fig4_scenario_coverage":   ("fig4", lambda c: _memo(c, "fig4_scenario_coverage")),
     "fig4_test_composition":    ("fig4", fig4_composition),
     "fig4_group_metrics":       ("fig4", fig4_group_metrics),
@@ -1664,14 +1628,11 @@ MAIN_TITLES = {   # block -> title row of its table in the workbook
     "fig2_rag_val_ablation":    "Fig. 2a and c. Validation MAE of the zero-shot RAG pipeline for each retrieval and prompt configuration, with bootstrap 95% confidence intervals.",
     "fig2_km_availability":     "Fig. 2b. Validation MAE for each number of same-scenario neighbours, scored on the cases for which such a neighbour is available, with bootstrap 95% confidence intervals.",
     "fig2_test_four_methods":   "Fig. 2d–g. Test-set MAE, sMAPE, Pearson r and Spearman ρ of the four methods, with bootstrap 95% confidence intervals.",
-    "fig3_total_trajectories":  "Fig. 3a. The 10th, 50th and 90th percentiles of total primary energy and total final energy per case in each decade, for AR6 and synthetic trajectories (EJ yr⁻¹).",
+    "fig3_group_trajectories":  "Fig. 3a. The 10th, 50th and 90th percentiles across test cases of each group of primary energy sources and each final energy sector in each decade, for AR6 and synthetic trajectories (EJ yr⁻¹).",
     "fig3_error_by_variable":   "Fig. 3b. MAE and sMAPE of the finetuned model for each variable, with bootstrap 95% confidence intervals.",
-    "fig3_box_quartiles_2050":  "Fig. 3c. Box statistics of the 2050 values of all 22 variables, for AR6 and synthetic trajectories. Values below 0.01 EJ yr⁻¹ were set to 0.01 EJ yr⁻¹.",
-    "fig3_value_density":       "Fig. 3d. Number of decadal values in each hexagonal bin. Bin centres are given as the base-10 logarithm of the value in EJ yr⁻¹ plus 0.01.",
-    "fig3_value_density_grid":  "Fig. 3d. Hexagonal grid of the density panel.",
-    "fig3_extremum_timing":     "Fig. 3e. Share of trajectories at each offset between the synthetic and the AR6 extremum year. The offsets of −30 and +30 years include larger offsets.",
-    "fig3_maximum_parity":      "Fig. 3f. Maximum of each test trajectory with a defined extremum, for AR6 and synthetic trajectories (EJ yr⁻¹).",
-    "fig3_panel_statistics":    "Fig. 3f. Numbers printed in the panel.",
+    "fig3_value_density":       "Fig. 3c. Number of decadal values in each hexagonal bin. Bin centres are given as the base-10 logarithm of the value in EJ yr⁻¹ plus 0.01.",
+    "fig3_value_density_grid":  "Fig. 3c. Hexagonal grid of the density panel.",
+    "fig3_extremum_timing":     "Fig. 3d. Share of trajectories at each offset between the synthetic and the AR6 extremum year. The offsets of −30 and +30 years include larger offsets.",
     "fig4_scenario_coverage":   "Fig. 4a. Number of scenarios for each design dimension and IAM family, with the coverage status.",
     "fig4_test_composition":    "Fig. 4b. Number of test cases in each group.",
     "fig4_group_metrics":       "Fig. 4c–f. Test-set metrics of the finetuned model for each group.",
