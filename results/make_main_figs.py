@@ -384,23 +384,23 @@ def fig3():
     PE = sorted(v for v in bv.index if v.startswith("Primary")); FE = sorted(v for v in bv.index if v.startswith("Final")); order_v = PE + FE
     xv = np.arange(len(order_v))
     gs_b = fig.add_gridspec(1, 1, left=0.085, right=0.945, top=0.640, bottom=0.495)
-    SLATE = "#4E5A66"
+    SMAPE_C = AR6_C                                   # sMAPE markers and right axis in gold
     ax = fig.add_subplot(gs_b[0, 0]); axr = ax.twinx()
-    axr.spines["top"].set_visible(False); axr.spines["right"].set_visible(True); axr.spines["right"].set_color(SLATE)
-    axr.tick_params(axis="y", colors=SLATE, width=0.6); ax.spines["left"].set_color(SYN); ax.tick_params(axis="y", colors=SYN, width=0.6)
+    axr.spines["top"].set_visible(False); axr.spines["right"].set_visible(True); axr.spines["right"].set_color(SMAPE_C)
+    axr.tick_params(axis="y", colors=SMAPE_C, width=0.6); ax.spines["left"].set_color(SYN); ax.tick_params(axis="y", colors=SYN, width=0.6)
     v_ = bv.loc[order_v, "mae"].to_numpy(float); lo = v_ - bv.loc[order_v, "mae_ci2.5"].to_numpy(float); hi = bv.loc[order_v, "mae_ci97.5"].to_numpy(float) - v_
     ax.bar(xv - 0.16, v_, 0.36, color=TEALS[3], yerr=[lo, hi], error_kw=dict(elinewidth=0.5, capsize=1.0, capthick=0.5, ecolor=INK), zorder=3)
     v_ = bv.loc[order_v, "smape_%"].to_numpy(float); lo = v_ - bv.loc[order_v, "smape_ci2.5"].to_numpy(float); hi = bv.loc[order_v, "smape_ci97.5"].to_numpy(float) - v_
-    axr.errorbar(xv + 0.22, v_, yerr=[lo, hi], fmt="o", ms=3.4, mfc="white", mec=SLATE, mew=0.9, ecolor=SLATE, elinewidth=0.6, capsize=1.0, capthick=0.6, zorder=5)
+    axr.errorbar(xv + 0.22, v_, yerr=[lo, hi], fmt="o", ms=3.4, mfc=GOLD, mec=SMAPE_C, mew=0.9, ecolor=SMAPE_C, elinewidth=0.6, capsize=1.0, capthick=0.6, zorder=5)
     ax.set_ylim(0, 1.45); set_yticks2(ax, [0, 0.5, 1.0], dec=1); axr.set_ylim(0, 36.25); axr.set_yticks([0, 10, 20, 30])
-    ax.set_ylabel("MAE (EJ yr$^{-1}$)", color=SYN); axr.set_ylabel("sMAPE (%)", color=SLATE, rotation=270, labelpad=10)
+    ax.set_ylabel("MAE (EJ yr$^{-1}$)", color=SYN); axr.set_ylabel("sMAPE (%)", color=SMAPE_C, rotation=270, labelpad=10)
     ax.axvline(len(PE) - 0.5, color=GRAY_L, lw=0.6, ls=(0, (3, 2)), zorder=0)
     for xc, txt in ((len(PE) / 2 - 0.5, "Primary energy"), (len(PE) + len(FE) / 2 - 0.5, "Final energy")):
         ax.text(xc, 1.0, txt, transform=ax.get_xaxis_transform(), ha="center", va="bottom", fontsize=6.2, color=MUTED)
     ax.set_xlim(-0.7, len(order_v) - 0.3); ax.set_xticks(xv)
     ax.set_xticklabels([_short_var(v) for v in order_v], fontsize=5.4, rotation=32, ha="right", rotation_mode="anchor"); ax.tick_params(axis="x", length=0)
     ax.set_zorder(axr.get_zorder() + 1); ax.patch.set_visible(False)
-    ax.legend([Rectangle((0, 0), 1, 1, color=TEALS[3]), plt.Line2D([], [], marker="o", ls="none", ms=3.4, mfc="white", mec=SLATE, mew=0.9)],
+    ax.legend([Rectangle((0, 0), 1, 1, color=TEALS[3]), plt.Line2D([], [], marker="o", ls="none", ms=3.4, mfc=GOLD, mec=SMAPE_C, mew=0.9)],
               ["MAE (left axis)", "sMAPE (right axis)"], frameon=False, fontsize=5.8, loc="upper left", ncol=2, handlelength=1.1,
               columnspacing=1.2, borderaxespad=0.2)
     plabel(ax, "b", pad=0.065)
