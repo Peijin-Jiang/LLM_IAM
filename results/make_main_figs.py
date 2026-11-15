@@ -63,7 +63,6 @@ M_LABELS = {"KNN": "KNN", "cVAE": "cVAE", "RAG": "RAG, Gemini 3.5 Flash-Lite", "
 ABL_L, ABL_D = GREYS[0], TEALS[4]
 AR6_C = "#B9954A"                                     # AR6 lines and box edges (dark gold)
 SYN = TEALS[4]                                        # synthetic
-CMAP_DENS = LinearSegmentedColormap.from_list("dens", ["#EDF6F3", "#7FBDAD", "#25836C", "#0F4D3C"])
 
 plt.rcParams.update({
     "font.family": "sans-serif",

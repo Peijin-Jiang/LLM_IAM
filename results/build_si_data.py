@@ -36,10 +36,8 @@ SI_STAT_BUILDERS = {
     "figS4_envelopes":            ("s4env",  lambda c: B.sheet_envelopes(c["gt_test"])),
     # ── Supplementary Fig. S5: distributions in 2050 and 2100 ────────────────
     "figS5_box_quartiles":        ("s5box",  lambda c: B.sheet_box_quartiles(c["gt_test"])),
-    # ── Supplementary Fig. S6: error by year and all decadal values ──────────
+    # ── Supplementary Fig. S6: error by year ─────────────────────────────────
     "figS6_error_by_year":        ("s6year", lambda c: B.sheet_error_by_year(c["gt_test"])),
-    "figS6_test_trajectories":    ("s6val",  lambda c: B._test_pairs(c["gt_test"])),
-    "figS6_all_values":           ("s6val",  lambda c: B.sheet_all_values(c["gt_test"])),
     # ── numbers reported in the Supplementary tables and text ────────────────
     "consistency_checks": ("cons",   lambda c: B.sheet_constraints(c["gt_test"])),
     "cost_time":         ("cost",   lambda c: B.sheet6()),
@@ -72,17 +70,9 @@ def figS3_coverage(c):
     d = _s(c, "figS3_scenario_coverage")
     return d[d.level.isin(["dimension", "family"])][["level", "dimension", "model_family", "n_scenarios"]].reset_index(drop=True)
 
-METHOD_KEYS = {"KNN (cond1 k2 uniform a0.75)": "KNN", "cVAE (cond1 lr1e-4 hid2048)": "cVAE",
-               "RAG (topk210, gemini-3.5-flash-lite)": "RAG", "Finetune Qwen3.5-9B (lr5e-4)": "Qwen3.5-9B"}
-
 def figS6_year(c):
-    d = _s(c, "figS6_error_by_year").copy(); d["method"] = d.method.map(METHOD_KEYS)
-    return d[["method", "year", "mae", "mae_ci2.5", "mae_ci97.5", "smape_%", "smape_ci2.5", "smape_ci97.5"]]
-
-def _density(c):
-    """Panel c: hexagonal bin counts of all decadal values, computed once per run."""
-    if "_density" not in c: c["_density"] = B.value_density(_s(c, "figS6_test_trajectories"))
-    return c["_density"]
+    d = _s(c, "figS6_error_by_year"); d = d[d.method.eq(B.TEST_PREDS_QWEN)]
+    return d[["year", "mae", "mae_ci2.5", "mae_ci97.5", "smape_%", "smape_ci2.5", "smape_ci97.5"]].reset_index(drop=True)
 
 SI_BUILDERS = {
     "figS1_knn_sweep":            ("figS1", figS1_knn),
@@ -94,8 +84,6 @@ SI_BUILDERS = {
     "figS4_envelopes":            ("figS4", lambda c: _s(c, "figS4_envelopes").drop(columns=["median_diff_syn_minus_ar6"])),
     "figS5_box_quartiles":        ("figS5", lambda c: _s(c, "figS5_box_quartiles").drop(columns=["n_cases"])),
     "figS6_error_by_year":        ("figS6", figS6_year),
-    "figS6_value_density":        ("figS6", lambda c: _density(c)[0]),
-    "figS6_value_density_grid":   ("figS6", lambda c: _density(c)[1]),
 }
 SI_TITLES = {   # block -> title row of its table in the workbook
     "figS1_knn_sweep":          "Supplementary Fig. S1a and b. Validation MAE of the KNN baseline for each k and α under uniform and similarity weights. The selected setting is marked.",
@@ -106,9 +94,7 @@ SI_TITLES = {   # block -> title row of its table in the workbook
     "figS3_scenario_coverage":  "Supplementary Fig. S3a and b. Number of scenarios for each design dimension and for each IAM family.",
     "figS4_envelopes":          "Supplementary Fig. S4. The 10th, 50th and 90th percentiles across test cases for each variable and year, for AR6 and synthetic trajectories (EJ yr⁻¹).",
     "figS5_box_quartiles":      "Supplementary Fig. S5a and b. Box statistics of the 2050 and 2100 values of all 22 variables, for AR6 and synthetic trajectories. Values below 0.01 EJ yr⁻¹ were set to 0.01 EJ yr⁻¹.",
-    "figS6_error_by_year":      "Supplementary Fig. S6a and b. Test-set MAE and sMAPE of the four methods in each year, with bootstrap 95% confidence intervals.",
-    "figS6_value_density":      "Supplementary Fig. S6c. Number of decadal values in each hexagonal bin. Bin centres are given as the base-10 logarithm of the value in EJ yr⁻¹ plus 0.01.",
-    "figS6_value_density_grid": "Supplementary Fig. S6c. Hexagonal grid of the density panel.",
+    "figS6_error_by_year":      "Supplementary Fig. S6. Test-set MAE and sMAPE of the finetuned model in each year, with bootstrap 95% confidence intervals.",
 }
 SI_STAT_LAYOUT = {   # sheet -> [(block, where it is reported, description)]
     "FigS1": [("figS1_knn_sweep", "a, b", ""), ("figS1_cvae_sweep", "c", ""), ("figS1_ft9b_lr_val", "d", "")],
@@ -116,7 +102,7 @@ SI_STAT_LAYOUT = {   # sheet -> [(block, where it is reported, description)]
     "FigS3": [("figS3_scenario_coverage", "a, b", "")],
     "FigS4": [("figS4_envelopes", "", "")],
     "FigS5": [("figS5_box_quartiles", "a, b", "")],
-    "FigS6": [("figS6_error_by_year", "a, b", ""), ("figS6_test_trajectories", "c", ""), ("figS6_all_values", "c", "")],
+    "FigS6": [("figS6_error_by_year", "", "")],
     "Tables": [("consistency_checks", "Table S9", "sectoral consistency checks on the generated trajectories"),
                ("cost_time", "Table S10", "run time and cost per method"),
                ("neighbour_statistics", "Text S5", "neighbour availability in the retrieval step")],

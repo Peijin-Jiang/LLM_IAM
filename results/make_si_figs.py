@@ -9,7 +9,7 @@ helpers come from make_main_figs.py.
   figS3_coverage         scenarios per design dimension and per IAM family
   figS4_trajectories     medians and percentile ranges of all 22 variables over time
   figS5_distributions    distributions of all 22 variables in 2050 and 2100
-  figS6_year_values      error of the four methods by year; all decadal values
+  figS6_error_by_year    error of the finetuned model by year
 Usage:  python3 make_si_figs.py [S1 S2 S3 S4 S5 S6]
 """
 import sys
@@ -25,7 +25,7 @@ from matplotlib.colors import LinearSegmentedColormap
 
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
-from make_main_figs import (TEALS, GOLD_L, GRAY_L, INK, MUTED, ROSE, AR6_C, SYN, CMAP_TEAL, CMAP_DENS, MM, EKW, M_COLORS, M_LABELS,
+from make_main_figs import (TEALS, GOLD, GOLD_L, GRAY_L, INK, MUTED, ROSE, AR6_C, SYN, CMAP_TEAL, MM, EKW,
                             set_yticks2, plabel, blabel, save, sheet, _NAMES, err, DIM_SHORT, REGION_SHORT, _short_var, box_stats)
 
 SI_XLSX = _HERE / "si_figure_data.xlsx"
@@ -39,7 +39,7 @@ SI_BLOCKS = {
     "FigS3": ["figS3_scenario_coverage"],
     "FigS4": ["figS4_envelopes"],
     "FigS5": ["figS5_box_quartiles"],
-    "FigS6": ["figS6_error_by_year", "figS6_value_density", "figS6_value_density_grid"],
+    "FigS6": ["figS6_error_by_year"],
 }
 _NAMES[SI_XLSX] = SI_BLOCKS
 
@@ -271,41 +271,23 @@ def figS5():
 
 
 def figS6():
-    """a, b, test-set MAE and sMAPE of the four methods in each year; c, all
-    decadal values of the finetuned model, AR6 vs synthetic."""
-    ey = si_sheet("figS6_error_by_year"); order = ["KNN", "cVAE", "RAG", "Qwen3.5-9B"]
-    fig = plt.figure(figsize=(185 * MM, 68 * MM))
-    gs = fig.add_gridspec(1, 3, left=0.075, right=0.915, top=0.870, bottom=0.300, wspace=0.46)
-    for j, (col, ylab, ymax, tks, dec) in enumerate((("mae", "MAE (EJ yr$^{-1}$)", 1.6, [0, 0.5, 1.0, 1.5], 1), ("smape_%", "sMAPE (%)", 38, [0, 10, 20, 30], 0))):
-        ax = fig.add_subplot(gs[0, j]); lo_c, hi_c = ("mae_ci2.5", "mae_ci97.5") if col == "mae" else ("smape_ci2.5", "smape_ci97.5")
-        for m in order:
-            d = ey[ey.method.eq(m)].sort_values("year"); x = d.year.to_numpy(int); y = d[col].to_numpy(float)
-            ax.fill_between(x, d[lo_c].to_numpy(float), d[hi_c].to_numpy(float), color=M_COLORS[m], alpha=0.25, lw=0, zorder=2)
-            ax.plot(x, y, color=M_COLORS[m], lw=1.6 if m == "Qwen3.5-9B" else 1.2, marker="o", ms=2.6, mfc=M_COLORS[m], mec="white", mew=0.5,
-                    zorder=5 if m == "Qwen3.5-9B" else 3)
-        ax.set_xlim(2005, 2105); ax.set_xticks([2010, 2040, 2070, 2100]); ax.set_ylim(0, ymax); set_yticks2(ax, tks, dec=dec)
-        ax.set_xlabel("Year"); ax.set_ylabel(ylab); plabel(ax, "ab"[j], pad=0.055 if j == 0 else 0.050)
-    handles = [plt.Line2D([], [], color=M_COLORS[m], lw=1.6, marker="o", ms=2.6, mec="white", mew=0.5) for m in order]
-    fig.legend(handles, [M_LABELS[m] for m in order], frameon=False, loc="upper center", bbox_to_anchor=(0.36, 0.115), ncol=4, fontsize=5.8,
-               handlelength=1.8, columnspacing=1.4)
-    # c: hexbin of all decadal values (log10(v + 0.01))
-    dn = si_sheet("figS6_value_density"); g_ = si_sheet("figS6_value_density_grid").iloc[0]
-    ax = fig.add_subplot(gs[0, 2]); f = lambda v: np.log10(np.clip(v, 0, None) + 0.01)
-    hb = ax.hexbin(dn.ar6_log10, dn.synthetic_log10, C=dn.n_values, reduce_C_function=np.sum, gridsize=int(g_.gridsize),
-                   extent=(g_.ar6_log10_min, g_.ar6_log10_max, g_.synthetic_log10_min, g_.synthetic_log10_max),
-                   bins="log", cmap=CMAP_DENS, linewidths=0.1, edgecolors="none")
-    lim = (f(0), f(200)); ax.plot(lim, lim, color=INK, lw=0.8, ls=(0, (3, 2)), zorder=6)
-    tk = [0, 0.1, 1, 10, 100]
-    for axis in (ax.xaxis, ax.yaxis):
-        axis.set_major_locator(mticker.FixedLocator([f(t) for t in tk])); axis.set_major_formatter(mticker.FixedFormatter(["0", "0.1", "1", "10", "100"]))
-    ax.set_xlim(*lim); ax.set_ylim(*lim); ax.set_aspect("equal", adjustable="box")
-    ax.set_xlabel("AR6 value (EJ yr$^{-1}$)"); ax.set_ylabel("Synthetic value (EJ yr$^{-1}$)", labelpad=1)
-    ax.text(0.04, 0.96, f"n = {int(dn.n_values.sum()):,} values", transform=ax.transAxes, ha="left", va="top", fontsize=5.0, color=INK)
-    cax = ax.inset_axes([1.04, 0.0, 0.045, 1.0]); cb = fig.colorbar(hb, cax=cax); cb.ax.tick_params(labelsize=5.4, length=1.5, width=0.4)
-    cb.set_ticks([1, 10, 100, 1000, 10000]); cb.set_ticklabels(["1", "10", "100", "1,000", "10,000"]); cb.ax.minorticks_off()
-    cb.set_label("Number of values per bin", fontsize=5.8, labelpad=2); cb.outline.set_linewidth(0.4)
-    plabel(ax, "c", pad=0.050)
-    save(fig, "figS6_year_values")
+    """Test-set MAE and sMAPE of the finetuned model in each year (same marks as Fig. 3b)."""
+    ey = si_sheet("figS6_error_by_year").sort_values("year"); x = ey.year.to_numpy(int)
+    fig = plt.figure(figsize=(100 * MM, 62 * MM))
+    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.150, right=0.860, top=0.900, bottom=0.200)[0, 0]); axr = ax.twinx()
+    axr.spines["top"].set_visible(False); axr.spines["right"].set_visible(True); axr.spines["right"].set_color(AR6_C)
+    axr.tick_params(axis="y", colors=AR6_C, width=0.6); ax.spines["left"].set_color(SYN); ax.tick_params(axis="y", colors=SYN, width=0.6)
+    v_ = ey["mae"].to_numpy(float); lo = v_ - ey["mae_ci2.5"].to_numpy(float); hi = ey["mae_ci97.5"].to_numpy(float) - v_
+    ax.bar(x - 1.5, v_, 3.2, color=TEALS[3], yerr=[lo, hi], error_kw=dict(elinewidth=0.5, capsize=1.0, capthick=0.5, ecolor=INK), zorder=3)
+    v_ = ey["smape_%"].to_numpy(float); lo = v_ - ey["smape_ci2.5"].to_numpy(float); hi = ey["smape_ci97.5"].to_numpy(float) - v_
+    axr.errorbar(x + 2.2, v_, yerr=[lo, hi], fmt="o", ms=3.4, mfc=GOLD, mec=AR6_C, mew=0.9, ecolor=AR6_C, elinewidth=0.6, capsize=1.0, capthick=0.6, zorder=5)
+    ax.set_ylim(0, 1.0); set_yticks2(ax, [0, 0.5, 1.0], dec=1); axr.set_ylim(0, 20); axr.set_yticks([0, 10, 20])
+    ax.set_ylabel("MAE (EJ yr$^{-1}$)", color=SYN); axr.set_ylabel("sMAPE (%)", color=AR6_C, rotation=270, labelpad=10)
+    ax.set_xlim(2004, 2106); ax.set_xticks(x); ax.set_xticklabels([str(y) if y in (2010, 2040, 2070, 2100) else "" for y in x]); ax.set_xlabel("Year")
+    ax.set_zorder(axr.get_zorder() + 1); ax.patch.set_visible(False)
+    ax.legend([Rectangle((0, 0), 1, 1, color=TEALS[3]), plt.Line2D([], [], marker="o", ls="none", ms=3.4, mfc=GOLD, mec=AR6_C, mew=0.9)],
+              ["MAE (left axis)", "sMAPE (right axis)"], frameon=False, fontsize=5.8, loc="upper left", handlelength=1.1, labelspacing=0.35, borderaxespad=0.2)
+    save(fig, "figS6_error_by_year")
 
 
 if __name__ == "__main__":
