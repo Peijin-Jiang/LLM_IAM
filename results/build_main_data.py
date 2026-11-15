@@ -1275,7 +1275,7 @@ def sheet_total_trajectories(gt_test):
     disjoint sectors - the carrier and electricity variables overlap them,
     so they are NOT added).  A case enters a total only when every member
     variable is present in both GT and prediction for that year.  Rows give
-    the cross-case median / quartiles / mean of each total per year."""
+    the cross-case median / percentiles / mean of each total per year."""
     pred = pd.read_csv(OUTS / TEST_PREDS["Finetune Qwen3.5-9B (lr5e-4)"])
     pred.columns = [str(c).strip() for c in pred.columns]
     rows = []
@@ -1296,8 +1296,10 @@ def sheet_total_trajectories(gt_test):
                 rows.append({"total": name, "source": src, "year": int(y),
                              "n_cases": int(len(v)),
                              "median": round(float(np.median(v)), 4),
+                             "p10": round(float(np.percentile(v, 10)), 4),
                              "q25": round(float(np.percentile(v, 25)), 4),
                              "q75": round(float(np.percentile(v, 75)), 4),
+                             "p90": round(float(np.percentile(v, 90)), 4),
                              "mean": round(float(v.mean()), 4),
                              "mae_of_total": round(float(np.abs(
                                  tot[f"{y}_t"] - tot[f"{y}_p"]).mean()), 4)})
@@ -1500,7 +1502,7 @@ STAT_LAYOUT = {   # sheet -> [(block, panels, description)]
              ("fig2_km_availability", "b", "validation MAE as the number of same-scenario neighbours k_m changes, by availability group"),
              ("fig2_test_four_methods", "d-g", "test-set MAE, sMAPE, Pearson r and Spearman rho of the four methods, bootstrap 95% CI")],
     "Fig3": [("fig3_test_trajectories", "d", "AR6 test truth (_ar6) and finetuned-model prediction (_syn) for every test trajectory, EJ/yr"),
-             ("fig3_total_trajectories", "a", "median, quartiles and mean of total primary and total final energy per case, per year and source"),
+             ("fig3_total_trajectories", "a", "median, percentiles and mean of total primary and total final energy per case, per year and source"),
              ("fig3_error_by_variable", "b", "MAE and sMAPE per variable, bootstrap 95% CI"),
              ("fig3_box_quartiles_2050", "c", "box statistics (Q1, median, Q3, whisker ends) per variable and source, 2050"),
              ("fig3_all_values", "d", "pooled statistics over all decadal values"),
@@ -1544,7 +1546,7 @@ def fig2_methods(c):
     return d[["method"] + [m + s for m in _METRICS4 for s in ("", "_ci2.5", "_ci97.5")]].reset_index(drop=True)
 
 def fig3_totals(c):
-    return _memo(c, "fig3_total_trajectories").drop(columns=["mean", "mae_of_total"])
+    return _memo(c, "fig3_total_trajectories")[["total", "source", "year", "n_cases", "p10", "median", "p90"]]
 
 def fig3_error(c):
     d = _memo(c, "fig3_error_by_variable"); d = d[d.method.eq(TEST_PREDS_QWEN)]
@@ -1662,7 +1664,7 @@ MAIN_TITLES = {   # block -> title row of its table in the workbook
     "fig2_rag_val_ablation":    "Fig. 2a and c. Validation MAE of the zero-shot RAG pipeline for each retrieval and prompt configuration, with bootstrap 95% confidence intervals.",
     "fig2_km_availability":     "Fig. 2b. Validation MAE for each number of same-scenario neighbours, scored on the cases for which such a neighbour is available, with bootstrap 95% confidence intervals.",
     "fig2_test_four_methods":   "Fig. 2d–g. Test-set MAE, sMAPE, Pearson r and Spearman ρ of the four methods, with bootstrap 95% confidence intervals.",
-    "fig3_total_trajectories":  "Fig. 3a. Median and quartiles of total primary energy and total final energy per case in each decade, for AR6 and synthetic trajectories (EJ yr⁻¹).",
+    "fig3_total_trajectories":  "Fig. 3a. The 10th, 50th and 90th percentiles of total primary energy and total final energy per case in each decade, for AR6 and synthetic trajectories (EJ yr⁻¹).",
     "fig3_error_by_variable":   "Fig. 3b. MAE and sMAPE of the finetuned model for each variable, with bootstrap 95% confidence intervals.",
     "fig3_box_quartiles_2050":  "Fig. 3c. Box statistics of the 2050 values of all 22 variables, for AR6 and synthetic trajectories. Values below 0.01 EJ yr⁻¹ were set to 0.01 EJ yr⁻¹.",
     "fig3_value_density":       "Fig. 3d. Number of decadal values in each hexagonal bin. Bin centres are given as the base-10 logarithm of the value in EJ yr⁻¹ plus 0.01.",

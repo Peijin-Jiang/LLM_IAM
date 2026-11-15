@@ -355,26 +355,26 @@ YEARS = [str(y) for y in range(2010, 2101, 10)]
 
 def fig3():
     fig = plt.figure(figsize=(185 * MM, 210 * MM))
-    # a: total primary and total final energy per case (medians and interquartile ranges)
+    # a: total primary and total final energy per case (medians and 10th-90th percentile ranges)
     tt = sheet("fig3_total_trajectories")
     gs_a = fig.add_gridspec(1, 2, left=0.085, right=0.985, top=0.962, bottom=0.829, wspace=0.30)
-    for j, (name, title, yl, tks) in enumerate([("primary", "Total primary energy per case", (0, 130), [0, 60, 120]),
-                                                ("final", "Total final energy per case", (0, 95), [0, 45, 90])]):
+    for j, (name, title, yl, tks) in enumerate([("primary", "Total primary energy per case", (0, 170), [0, 50, 100, 150]),
+                                                ("final", "Total final energy per case", (0, 130), [0, 40, 80, 120])]):
         ax = fig.add_subplot(gs_a[0, j])
         dq = tt[tt.total.eq(name) & tt.source.eq("synthetic")].set_index("year").sort_index()
         da = tt[tt.total.eq(name) & tt.source.eq("AR6")].set_index("year").sort_index()
-        ax.fill_between(dq.index, dq.q25, dq.q75, color=TEALS[1], alpha=0.6, lw=0, zorder=2)
+        ax.fill_between(dq.index, dq.p10, dq.p90, color=TEALS[1], alpha=0.6, lw=0, zorder=2)
         ax.plot(dq.index, dq["median"], color=SYN, lw=2.0, zorder=5, solid_capstyle="round")
-        for q in ("q25", "q75"): ax.plot(da.index, da[q], color=AR6_C, lw=0.7, ls=(0, (2, 1.4)), zorder=4)
+        for q in ("p10", "p90"): ax.plot(da.index, da[q], color=AR6_C, lw=0.7, ls=(0, (2, 1.4)), zorder=4)
         ax.plot(da.index, da["median"], color=AR6_C, lw=1.3, ls=(0, (2.4, 2.0)), zorder=6, solid_capstyle="butt")
         ax.set_xlim(2008, 2102); ax.set_xticks([2010, 2050, 2100]); ax.set_ylim(*yl); set_yticks2(ax, tks, dec=0)
         ax.set_xlabel("Year", labelpad=1.5); ax.set_ylabel("EJ yr$^{-1}$")
         ax.text(0.03, 0.95, f"n = {int(dq.n_cases.iloc[0]):,} cases", transform=ax.transAxes, ha="left", va="top", fontsize=5.4, color=MUTED)
         ax.set_title(title, pad=7, fontsize=7.5)
         if j == 0: plabel(ax, "a", pad=0.065)
-    hA = [plt.Line2D([], [], color=SYN, lw=2.0), Rectangle((0, 0), 1, 1, color=TEALS[1], alpha=0.6),
-          plt.Line2D([], [], color=AR6_C, lw=1.3, ls=(0, (2.4, 2.0))), plt.Line2D([], [], color=AR6_C, lw=0.7, ls=(0, (2, 1.4)))]
-    fig.legend(hA, ["Synthetic median", "Synthetic interquartile range", "AR6 median", "AR6 quartiles"], frameon=False, loc="upper center",
+    hA = [Rectangle((0, 0), 1, 1, color=TEALS[1], alpha=0.6), plt.Line2D([], [], color=SYN, lw=2.0),
+          plt.Line2D([], [], color=AR6_C, lw=0.7, ls=(0, (2, 1.4))), plt.Line2D([], [], color=AR6_C, lw=1.3, ls=(0, (2.4, 2.0)))]
+    fig.legend(hA, ["Synthetic, 10th–90th percentile", "Synthetic median", "AR6, 10th and 90th percentile", "AR6 median"], frameon=False, loc="upper center",
                bbox_to_anchor=(0.54, 0.771), ncol=4, fontsize=5.8, handlelength=1.8, columnspacing=1.6)
 
     # b: per-variable MAE / sMAPE, teal and grey (gold stays AR6-only)
