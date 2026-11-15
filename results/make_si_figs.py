@@ -9,7 +9,7 @@ helpers come from make_main_figs.py.
   figS3_coverage         scenarios per design dimension and per IAM family
   figS4_trajectories     medians and percentile ranges of all 22 variables over time
   figS5_distributions    distributions of all 22 variables in 2050 and 2100
-  figS6_year_maximum     error of the four methods by year; maximum values
+  figS6_year_values      error of the four methods by year; all decadal values
 Usage:  python3 make_si_figs.py [S1 S2 S3 S4 S5 S6]
 """
 import sys
@@ -25,7 +25,7 @@ from matplotlib.colors import LinearSegmentedColormap
 
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
-from make_main_figs import (TEALS, GOLD_L, GRAY_L, INK, MUTED, ROSE, AR6_C, SYN, CMAP_TEAL, MM, EKW, M_COLORS, M_LABELS,
+from make_main_figs import (TEALS, GOLD_L, GRAY_L, INK, MUTED, ROSE, AR6_C, SYN, CMAP_TEAL, CMAP_DENS, MM, EKW, M_COLORS, M_LABELS,
                             set_yticks2, plabel, blabel, save, sheet, _NAMES, err, DIM_SHORT, REGION_SHORT, _short_var, box_stats)
 
 SI_XLSX = _HERE / "si_figure_data.xlsx"
@@ -39,7 +39,7 @@ SI_BLOCKS = {
     "FigS3": ["figS3_scenario_coverage"],
     "FigS4": ["figS4_envelopes"],
     "FigS5": ["figS5_box_quartiles"],
-    "FigS6": ["figS6_error_by_year", "figS6_maximum_parity", "figS6_maximum_statistics"],
+    "FigS6": ["figS6_error_by_year", "figS6_value_density", "figS6_value_density_grid"],
 }
 _NAMES[SI_XLSX] = SI_BLOCKS
 
@@ -271,11 +271,11 @@ def figS5():
 
 
 def figS6():
-    """a, b, test-set MAE and sMAPE of the four methods in each year; c, maximum
-    value of each trajectory, AR6 vs synthetic."""
+    """a, b, test-set MAE and sMAPE of the four methods in each year; c, all
+    decadal values of the finetuned model, AR6 vs synthetic."""
     ey = si_sheet("figS6_error_by_year"); order = ["KNN", "cVAE", "RAG", "Qwen3.5-9B"]
     fig = plt.figure(figsize=(185 * MM, 68 * MM))
-    gs = fig.add_gridspec(1, 3, left=0.075, right=0.985, top=0.870, bottom=0.300, wspace=0.42)
+    gs = fig.add_gridspec(1, 3, left=0.075, right=0.915, top=0.870, bottom=0.300, wspace=0.46)
     for j, (col, ylab, ymax, tks, dec) in enumerate((("mae", "MAE (EJ yr$^{-1}$)", 1.6, [0, 0.5, 1.0, 1.5], 1), ("smape_%", "sMAPE (%)", 38, [0, 10, 20, 30], 0))):
         ax = fig.add_subplot(gs[0, j]); lo_c, hi_c = ("mae_ci2.5", "mae_ci97.5") if col == "mae" else ("smape_ci2.5", "smape_ci97.5")
         for m in order:
@@ -288,20 +288,24 @@ def figS6():
     handles = [plt.Line2D([], [], color=M_COLORS[m], lw=1.6, marker="o", ms=2.6, mec="white", mew=0.5) for m in order]
     fig.legend(handles, [M_LABELS[m] for m in order], frameon=False, loc="upper center", bbox_to_anchor=(0.36, 0.115), ncol=4, fontsize=5.8,
                handlelength=1.8, columnspacing=1.4)
-    # c: maximum-value parity
-    pk_ = si_sheet("figS6_maximum_parity"); gpk = pk_.ar6_maximum.to_numpy(float); ppk = pk_.synthetic_maximum.to_numpy(float)
-    st = si_sheet("figS6_maximum_statistics").set_index("quantity").value
-    ax = fig.add_subplot(gs[0, 2]); hi_ = 150
-    ax.plot([0, hi_], [0, hi_], color=INK, lw=0.8, ls=(0, (3, 2)), zorder=6)
-    ax.scatter(gpk, ppk, s=4, color=SYN, alpha=0.30, linewidths=0, zorder=3, rasterized=True)
-    ax.set_xlim(-3, hi_); ax.set_ylim(-3, hi_); ax.set_aspect("equal", adjustable="box")
+    # c: hexbin of all decadal values (log10(v + 0.01))
+    dn = si_sheet("figS6_value_density"); g_ = si_sheet("figS6_value_density_grid").iloc[0]
+    ax = fig.add_subplot(gs[0, 2]); f = lambda v: np.log10(np.clip(v, 0, None) + 0.01)
+    hb = ax.hexbin(dn.ar6_log10, dn.synthetic_log10, C=dn.n_values, reduce_C_function=np.sum, gridsize=int(g_.gridsize),
+                   extent=(g_.ar6_log10_min, g_.ar6_log10_max, g_.synthetic_log10_min, g_.synthetic_log10_max),
+                   bins="log", cmap=CMAP_DENS, linewidths=0.1, edgecolors="none")
+    lim = (f(0), f(200)); ax.plot(lim, lim, color=INK, lw=0.8, ls=(0, (3, 2)), zorder=6)
+    tk = [0, 0.1, 1, 10, 100]
     for axis in (ax.xaxis, ax.yaxis):
-        axis.set_major_locator(mticker.FixedLocator([0, 50, 100, 150])); axis.set_major_formatter(mticker.FixedFormatter(["0", "50", "100", "150"]))
-    ax.set_xlabel("AR6 maximum (EJ yr$^{-1}$)"); ax.set_ylabel("Synthetic maximum (EJ yr$^{-1}$)", labelpad=1)
-    ax.text(0.04, 0.96, f"median rel. error {100 * float(st['maximum_median_relative_error']):.1f}%\n$R^2$ = {float(st['maximum_r2']):.3f}", transform=ax.transAxes,
-            ha="left", va="top", fontsize=5.4, color=INK, linespacing=1.25)
+        axis.set_major_locator(mticker.FixedLocator([f(t) for t in tk])); axis.set_major_formatter(mticker.FixedFormatter(["0", "0.1", "1", "10", "100"]))
+    ax.set_xlim(*lim); ax.set_ylim(*lim); ax.set_aspect("equal", adjustable="box")
+    ax.set_xlabel("AR6 value (EJ yr$^{-1}$)"); ax.set_ylabel("Synthetic value (EJ yr$^{-1}$)", labelpad=1)
+    ax.text(0.04, 0.96, f"n = {int(dn.n_values.sum()):,} values", transform=ax.transAxes, ha="left", va="top", fontsize=5.0, color=INK)
+    cax = ax.inset_axes([1.04, 0.0, 0.045, 1.0]); cb = fig.colorbar(hb, cax=cax); cb.ax.tick_params(labelsize=5.4, length=1.5, width=0.4)
+    cb.set_ticks([1, 10, 100, 1000, 10000]); cb.set_ticklabels(["1", "10", "100", "1,000", "10,000"]); cb.ax.minorticks_off()
+    cb.set_label("Number of values per bin", fontsize=5.8, labelpad=2); cb.outline.set_linewidth(0.4)
     plabel(ax, "c", pad=0.050)
-    save(fig, "figS6_year_maximum")
+    save(fig, "figS6_year_values")
 
 
 if __name__ == "__main__":

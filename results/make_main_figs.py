@@ -12,8 +12,8 @@ Colour rule: teal = synthetic (finetuned Qwen3.5-9B), gold = AR6, greys =
 baselines, other IAM families and references; in Fig. 4 gold also marks the
 lower-coverage / unseen strata.
   fig2_methods           RAG ablation (validation) + four-method test comparison
-  fig3_fidelity          stacked group means, error by variable, all-values density,
-                         extremum timing (Qwen)
+  fig3_fidelity          stacked group means, error by variable, extremum timing,
+                         maximum parity (Qwen)
   fig4_generalisation    coverage matrix, test-set composition, metrics by stratum,
                          one-assumption examples
   fig5_usecase           four held-out IAM family x scenario cells vs the other families
@@ -122,8 +122,8 @@ def save(fig, stem):
 # The data tables of each sheet, in their order on the sheet.
 MAIN_BLOCKS = {
     "Fig2": ["fig2_rag_val_ablation", "fig2_km_availability", "fig2_test_four_methods"],
-    "Fig3": ["fig3_group_trajectories", "fig3_error_by_variable", "fig3_value_density", "fig3_value_density_grid",
-             "fig3_extremum_timing"],
+    "Fig3": ["fig3_group_trajectories", "fig3_error_by_variable", "fig3_extremum_timing", "fig3_maximum_parity",
+             "fig3_maximum_statistics"],
     "Fig4": ["fig4_scenario_coverage", "fig4_test_composition", "fig4_group_metrics", "fig4_reference_lines",
              "fig4_contrast_examples"],
     "Fig5": ["fig5_heldout_deviations"],
@@ -405,32 +405,11 @@ def fig3():
               columnspacing=1.2, borderaxespad=0.2)
     plabel(ax, "b", pad=0.065)
 
-    # c, d: all-values density parity and extremum timing
-    # c: hexbin of all decadal values (log10(v + 0.01))
-    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.085, right=0.355, top=0.365, bottom=0.107)[0, 0])
-    dn = sheet("fig3_value_density"); g_ = sheet("fig3_value_density_grid").iloc[0]
-    f = lambda v: np.log10(np.clip(v, 0, None) + 0.01)
-    hb = ax.hexbin(dn.ar6_log10, dn.synthetic_log10, C=dn.n_values, reduce_C_function=np.sum, gridsize=int(g_.gridsize),
-                   extent=(g_.ar6_log10_min, g_.ar6_log10_max, g_.synthetic_log10_min, g_.synthetic_log10_max),
-                   bins="log", cmap=CMAP_DENS, linewidths=0.1, edgecolors="none")
-    lim = (f(0), f(200))
-    ax.plot(lim, lim, color=INK, lw=0.8, ls=(0, (3, 2)), zorder=6)
-    tk = [0, 0.1, 1, 10, 100]; tkl = ["0", "0.1", "1", "10", "100"]
-    for axis in (ax.xaxis, ax.yaxis):
-        axis.set_major_locator(mticker.FixedLocator([f(t) for t in tk])); axis.set_major_formatter(mticker.FixedFormatter(tkl))
-    ax.set_xlim(*lim); ax.set_ylim(*lim); ax.set_aspect("equal", adjustable="box")
-    ax.set_xlabel("AR6 value (EJ yr$^{-1}$)"); ax.set_ylabel("Synthetic value (EJ yr$^{-1}$)", labelpad=1)
-    ax.text(0.04, 0.96, f"n = {int(dn.n_values.sum()):,} values\n(24,805 trajectories × 10 decades)", transform=ax.transAxes, ha="left", va="top", fontsize=5.0,
-            color=INK, linespacing=1.25)
-    cax = ax.inset_axes([1.04, 0.0, 0.045, 1.0]); cb = fig.colorbar(hb, cax=cax); cb.ax.tick_params(labelsize=5.4, length=1.5, width=0.4)
-    cb.set_ticks([1, 10, 100, 1000, 10000]); cb.set_ticklabels(["1", "10", "100", "1,000", "10,000"]); cb.ax.minorticks_off()
-    cb.set_label("Number of values per bin", fontsize=5.8, labelpad=2); cb.outline.set_linewidth(0.4)
-    ax.set_title("All decadal values", pad=8, fontsize=7.5); plabel(ax, "c", pad=0.065)
-
-    # d: extremum timing
+    # c, d: extremum timing and maximum-value parity
+    # c: extremum timing
     et = sheet("fig3_extremum_timing").pivot(index="offset_years", columns="extremum", values="trajectories_%")
     offs = [-30, -20, -10, 0, 10, 20, 30]
-    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.585, right=0.945, top=0.365, bottom=0.107)[0, 0]); xo = np.arange(len(offs)); w = 0.38
+    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.085, right=0.445, top=0.365, bottom=0.107)[0, 0]); xo = np.arange(len(offs)); w = 0.38
     pk = [float(et.loc[k, "maximum"]) for k in offs]; tr = [float(et.loc[k, "minimum"]) for k in offs]
     ax.bar(xo - w / 2, pk, w, color=SYN, zorder=3, label="Maximum")
     ax.bar(xo + w / 2, tr, w, color=GOLD, zorder=3, label="Minimum")
@@ -444,7 +423,21 @@ def fig3():
     ax.set_xlim(-0.6, len(offs) - 0.4); ax.set_ylim(0, 137); set_yticks2(ax, [0, 25, 50, 75, 100], dec=0)
     ax.set_xlabel("Synthetic minus AR6 extremum year (yr)"); ax.set_ylabel("Trajectories (%)")
     ax.legend(frameon=False, fontsize=5.8, loc="center left", bbox_to_anchor=(0.0, 0.52), handlelength=1.0, labelspacing=0.35, borderaxespad=0.2)
-    ax.set_title("Extremum timing", pad=8, fontsize=7.5); plabel(ax, "d", pad=0.055)
+    ax.set_title("Extremum timing", pad=8, fontsize=7.5); plabel(ax, "c", pad=0.065)
+
+    # d: maximum-value parity
+    pk_ = sheet("fig3_maximum_parity"); gpk = pk_.ar6_maximum.to_numpy(float); ppk = pk_.synthetic_maximum.to_numpy(float)
+    st = sheet("fig3_maximum_statistics").set_index("quantity").value
+    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.640, right=0.910, top=0.365, bottom=0.107)[0, 0]); hi_ = 150
+    ax.plot([0, hi_], [0, hi_], color=INK, lw=0.8, ls=(0, (3, 2)), zorder=6)
+    ax.scatter(gpk, ppk, s=4, color=SYN, alpha=0.30, linewidths=0, zorder=3, rasterized=True)
+    ax.set_xlim(-3, hi_); ax.set_ylim(-3, hi_); ax.set_aspect("equal", adjustable="box")
+    for axis in (ax.xaxis, ax.yaxis):
+        axis.set_major_locator(mticker.FixedLocator([0, 50, 100, 150])); axis.set_major_formatter(mticker.FixedFormatter(["0", "50", "100", "150"]))
+    ax.set_xlabel("AR6 maximum (EJ yr$^{-1}$)"); ax.set_ylabel("Synthetic maximum (EJ yr$^{-1}$)", labelpad=1)
+    ax.text(0.04, 0.96, f"median rel. error {100 * float(st['maximum_median_relative_error']):.1f}%\n$R^2$ = {float(st['maximum_r2']):.3f}", transform=ax.transAxes,
+            ha="left", va="top", fontsize=5.4, color=INK, linespacing=1.25)
+    ax.set_title("Maximum value", pad=8, fontsize=7.5); plabel(ax, "d", pad=0.055)
     save(fig, "fig3_fidelity")
 
 # ══════════════════════════════════ fig 4: generalisation of Qwen3.5-9B ═════

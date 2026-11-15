@@ -1158,7 +1158,7 @@ def extremum_offset_weights(true_years, pred_years):
 
 
 def sheet_shape_fidelity(gt_test):
-    """Fig. 3d and Supplementary Fig. S6c: extrema timing and maximum magnitude.
+    """Fig. 3c,d: extrema timing and maximum magnitude.
 
     Timing is assessed on complete, nonconstant AR6 trajectories, including
     endpoint extrema and partial ties. Constant predictions are timing failures.
@@ -1328,7 +1328,7 @@ def sheet_box_quartiles(gt_test):
 
 
 def sheet_peak_height(gt_test):
-    """Fig. 3d and Supplementary Fig. S6c: maxima and all tied extremum years for every trajectory.
+    """Fig. 3c,d: maxima and all tied extremum years for every trajectory.
 
     Columns named peak hold maxima, including endpoint maxima.
     The timing_eligible flag defines the shared sample for both panels.
@@ -1387,7 +1387,7 @@ def sheet_envelopes(gt_test):
     return pd.DataFrame(rows)
 
 def sheet_all_values(gt_test):
-    """Fig. 3c: pooled statistics over all 248,050 decadal values (24,805 trajectories x 10 decades)."""
+    """Supplementary Fig. S6c: pooled statistics over all 248,050 decadal values (24,805 trajectories x 10 decades)."""
     m = _test_pairs(gt_test)
     xa = m[[f"{y}_ar6" for y in YEARS]].to_numpy(float).ravel(); xs = m[[f"{y}_syn" for y in YEARS]].to_numpy(float).ravel()
     e = np.abs(xs - xa)
@@ -1470,11 +1470,10 @@ STAT_BUILDERS = {
     "fig2_km_availability":       ("kmav",   lambda c: sheet_km_availability(c["gt_val"])),
     "fig2_test_four_methods":     ("test",   lambda c: sheet5(c["gt_test"])),
     # ── Fig. 3: fidelity of the finetuned model ────────────────────────────
-    "fig3_test_trajectories":     ("traj",   lambda c: _test_pairs(c["gt_test"])),
     "fig3_group_trajectories":    ("grp3",   lambda c: sheet_group_trajectories(c["gt_test"])),
     "fig3_error_by_variable":     ("byvar",  lambda c: sheet_error_by_variable(c["gt_test"])),
-    "fig3_all_values":            ("allv",   lambda c: sheet_all_values(c["gt_test"])),
     "fig3_shape_fidelity":        ("shape",  lambda c: sheet_shape_fidelity(c["gt_test"])),
+    "fig3_peak_height":           ("peak",   lambda c: sheet_peak_height(c["gt_test"])),
     # ── Fig. 4: coverage, strata, one-assumption examples ──────────────────
     "fig4_scenario_coverage":     ("dist",   lambda c: sheet_coverage()),
     "fig4_group_metrics":         ("grp",    lambda c: sheet7()),
@@ -1489,11 +1488,10 @@ STAT_LAYOUT = {   # sheet -> [(block, panels, description)]
     "Fig2": [("fig2_rag_val_ablation", "a, c", "validation MAE of the zero-shot RAG pipeline per retrieval / prompt configuration, bootstrap 95% CI"),
              ("fig2_km_availability", "b", "validation MAE as the number of same-scenario neighbours k_m changes, by availability group"),
              ("fig2_test_four_methods", "d-g", "test-set MAE, sMAPE, Pearson r and Spearman rho of the four methods, bootstrap 95% CI")],
-    "Fig3": [("fig3_test_trajectories", "c", "AR6 test truth (_ar6) and finetuned-model prediction (_syn) for every test trajectory, EJ/yr"),
-             ("fig3_group_trajectories", "a", "mean and 10th / 50th / 90th percentiles across test cases per group of variables, year and source"),
+    "Fig3": [("fig3_group_trajectories", "a", "mean and 10th / 50th / 90th percentiles across test cases per group of variables, year and source"),
              ("fig3_error_by_variable", "b", "MAE and sMAPE per variable, bootstrap 95% CI"),
-             ("fig3_all_values", "c", "pooled statistics over all decadal values"),
-             ("fig3_shape_fidelity", "d", "extremum-timing offsets and maximum-value statistics")],
+             ("fig3_shape_fidelity", "c, d", "extremum-timing offsets and maximum-value statistics"),
+             ("fig3_peak_height", "d", "AR6 and synthetic maximum per trajectory, with timing eligibility")],
     "Fig4": [("fig4_scenario_coverage", "a", "scenarios per design dimension x IAM family, with coverage status"),
              ("fig4_group_metrics", "b-f", "test-set metrics and case counts per stratum"),
              ("fig4_nearest_desc_scenario", "c-f", "dotted reference: error of the description-nearest scenario of the same family and region"),
@@ -1540,23 +1538,21 @@ def fig3_error(c):
 
 DENSITY_GRIDSIZE = 55
 
-def _value_density(c):
-    """Panel c: all decadal values of the test set, AR6 against synthetic, counted
-    on the hexagonal grid of the figure. Axes are log10(value + 0.01)."""
-    if "_density" not in c:
-        from matplotlib.figure import Figure
-        m = _memo(c, "fig3_test_trajectories")
-        xa = m[[f"{y}_ar6" for y in YEARS]].to_numpy(float).ravel(); xs = m[[f"{y}_syn" for y in YEARS]].to_numpy(float).ravel()
-        ok = np.isfinite(xa) & np.isfinite(xs); f = lambda v: np.log10(np.clip(v, 0, None) + 0.01)
-        xa, xs = f(xa[ok]), f(xs[ok])
-        hb = Figure().subplots().hexbin(xa, xs, gridsize=DENSITY_GRIDSIZE, mincnt=1)
-        off = hb.get_offsets(); cnt = np.asarray(hb.get_array()).astype(int)
-        assert cnt.sum() == len(xa)
-        bins = pd.DataFrame({"ar6_log10": off[:, 0], "synthetic_log10": off[:, 1], "n_values": cnt})
-        grid = pd.DataFrame([{"gridsize": DENSITY_GRIDSIZE, "ar6_log10_min": xa.min(), "ar6_log10_max": xa.max(),
-                              "synthetic_log10_min": xs.min(), "synthetic_log10_max": xs.max()}])
-        c["_density"] = (bins, grid)
-    return c["_density"]
+def value_density(m):
+    """Supplementary Fig. S6c: all decadal values of the test set, AR6 against
+    synthetic, counted on the hexagonal grid of the figure. Axes are
+    log10(value + 0.01). `m` is the table of _test_pairs. Returns (bins, grid)."""
+    from matplotlib.figure import Figure
+    xa = m[[f"{y}_ar6" for y in YEARS]].to_numpy(float).ravel(); xs = m[[f"{y}_syn" for y in YEARS]].to_numpy(float).ravel()
+    ok = np.isfinite(xa) & np.isfinite(xs); f = lambda v: np.log10(np.clip(v, 0, None) + 0.01)
+    xa, xs = f(xa[ok]), f(xs[ok])
+    hb = Figure().subplots().hexbin(xa, xs, gridsize=DENSITY_GRIDSIZE, mincnt=1)
+    off = hb.get_offsets(); cnt = np.asarray(hb.get_array()).astype(int)
+    assert cnt.sum() == len(xa)
+    bins = pd.DataFrame({"ar6_log10": off[:, 0], "synthetic_log10": off[:, 1], "n_values": cnt})
+    grid = pd.DataFrame([{"gridsize": DENSITY_GRIDSIZE, "ar6_log10_min": xa.min(), "ar6_log10_max": xa.max(),
+                          "synthetic_log10_min": xs.min(), "synthetic_log10_max": xs.max()}])
+    return bins, grid
 
 TIMING_OFFSETS = [-30, -20, -10, 0, 10, 20, 30]
 
@@ -1564,6 +1560,16 @@ def fig3_extremum_timing(c):
     d = _memo(c, "fig3_shape_fidelity"); q = d[d.method.eq(TEST_PREDS_QWEN)].iloc[0]
     return pd.DataFrame([{"extremum": lab, "offset_years": k, "trajectories_%": float(q[f"{col}_offset_{k:+d}_%"])}
                          for lab, col in (("maximum", "peak"), ("minimum", "trough")) for k in TIMING_OFFSETS])
+
+def fig3_maximum_parity(c):
+    """Panel d points: maximum of each test trajectory with a defined extremum, AR6 and synthetic."""
+    d = _memo(c, "fig3_peak_height"); d = d[d.timing_eligible.eq(True)]
+    return pd.DataFrame({"ar6_maximum": d.ar6_peak_height.to_numpy(float), "synthetic_maximum": d.synthetic_peak_height.to_numpy(float)})
+
+def fig3_maximum_statistics(c):
+    d = _memo(c, "fig3_shape_fidelity"); q = d[d.method.eq(TEST_PREDS_QWEN)].iloc[0]
+    return pd.DataFrame([{"quantity": "maximum_median_relative_error", "value": float(q.peak_value_rel_err_median)},
+                         {"quantity": "maximum_r2", "value": float(q.peak_height_r2)}])
 
 GROUP_LABELS = {"ALL test": "All test", "Lower coverage: dimension x IAM family": "Lower coverage",
                 "Higher coverage: dimension x IAM family": "Higher coverage",
@@ -1615,9 +1621,9 @@ MAIN_BUILDERS = {
     "fig2_test_four_methods":   ("fig2", fig2_methods),
     "fig3_group_trajectories":  ("fig3", fig3_groups),
     "fig3_error_by_variable":   ("fig3", fig3_error),
-    "fig3_value_density":       ("fig3", lambda c: _value_density(c)[0]),
-    "fig3_value_density_grid":  ("fig3", lambda c: _value_density(c)[1]),
     "fig3_extremum_timing":     ("fig3", fig3_extremum_timing),
+    "fig3_maximum_parity":      ("fig3", fig3_maximum_parity),
+    "fig3_maximum_statistics":  ("fig3", fig3_maximum_statistics),
     "fig4_scenario_coverage":   ("fig4", lambda c: _memo(c, "fig4_scenario_coverage")),
     "fig4_test_composition":    ("fig4", fig4_composition),
     "fig4_group_metrics":       ("fig4", fig4_group_metrics),
@@ -1631,9 +1637,9 @@ MAIN_TITLES = {   # block -> title row of its table in the workbook
     "fig2_test_four_methods":   "Fig. 2d–g. Test-set MAE, sMAPE, Pearson r and Spearman ρ of the four methods, with bootstrap 95% confidence intervals.",
     "fig3_group_trajectories":  "Fig. 3a. Mean across test cases of each group of primary energy sources and each final energy sector in each decade, for AR6 and synthetic trajectories (EJ yr⁻¹).",
     "fig3_error_by_variable":   "Fig. 3b. MAE and sMAPE of the finetuned model for each variable, with bootstrap 95% confidence intervals.",
-    "fig3_value_density":       "Fig. 3c. Number of decadal values in each hexagonal bin. Bin centres are given as the base-10 logarithm of the value in EJ yr⁻¹ plus 0.01.",
-    "fig3_value_density_grid":  "Fig. 3c. Hexagonal grid of the density panel.",
-    "fig3_extremum_timing":     "Fig. 3d. Share of trajectories at each offset between the synthetic and the AR6 extremum year. The offsets of −30 and +30 years include larger offsets.",
+    "fig3_extremum_timing":     "Fig. 3c. Share of trajectories at each offset between the synthetic and the AR6 extremum year. The offsets of −30 and +30 years include larger offsets.",
+    "fig3_maximum_parity":      "Fig. 3d. Maximum of each test trajectory with a defined extremum, for AR6 and synthetic trajectories (EJ yr⁻¹).",
+    "fig3_maximum_statistics":  "Fig. 3d. Numbers printed in the panel.",
     "fig4_scenario_coverage":   "Fig. 4a. Number of scenarios for each design dimension and IAM family, with the coverage status.",
     "fig4_test_composition":    "Fig. 4b. Number of test cases in each group.",
     "fig4_group_metrics":       "Fig. 4c–f. Test-set metrics of the finetuned model for each group.",
