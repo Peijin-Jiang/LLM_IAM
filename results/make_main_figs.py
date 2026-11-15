@@ -356,9 +356,9 @@ def fig3():
     fig = plt.figure(figsize=(185 * MM, 194 * MM))
     # a: mean energy per case, stacked by group: three groups of primary energy sources (left) and the three final
     #    energy sectors (right). Areas = synthetic, dashed lines = AR6.
-    gt_ = sheet("fig3_group_trajectories"); SHADES = [TEALS[4], TEALS[2], TEALS[0]]; col_l, col_r = [], []   # axes of the left and right column
+    gt_ = sheet("fig3_group_trajectories"); SHADES = [TEALS[4], TEALS[2], TEALS[0]]
     for r, (energy, title, left, right) in enumerate((("primary", "Primary energy", 0.085, 0.385), ("final", "Final energy", 0.585, 0.885))):
-        ax = fig.add_subplot(fig.add_gridspec(1, 1, left=left, right=right, top=0.925, bottom=0.745)[0, 0]); (col_l, col_r)[r].append(ax)
+        ax = fig.add_subplot(fig.add_gridspec(1, 1, left=left, right=right, top=0.925, bottom=0.745)[0, 0])
         d_ = gt_[gt_.energy.eq(energy)]; groups = list(dict.fromkeys(d_.group))
         n_cases = int(d_.n_cases.iloc[0]); assert d_.n_cases.eq(n_cases).all()
         yrs = np.sort(d_.year.unique()); base_s = np.zeros(len(yrs)); base_a = np.zeros(len(yrs))
@@ -384,7 +384,7 @@ def fig3():
     xv = np.arange(len(order_v))
     gs_b = fig.add_gridspec(1, 1, left=0.085, right=0.945, top=0.640, bottom=0.495)
     SMAPE_C = AR6_C                                   # sMAPE markers and right axis in gold
-    ax = fig.add_subplot(gs_b[0, 0]); axr = ax.twinx(); col_l.append(ax)
+    ax = fig.add_subplot(gs_b[0, 0]); axr = ax.twinx()
     axr.spines["top"].set_visible(False); axr.spines["right"].set_visible(True); axr.spines["right"].set_color(SMAPE_C)
     axr.tick_params(axis="y", colors=SMAPE_C, width=0.6); ax.spines["left"].set_color(SYN); ax.tick_params(axis="y", colors=SYN, width=0.6)
     v_ = bv.loc[order_v, "mae"].to_numpy(float); lo = v_ - bv.loc[order_v, "mae_ci2.5"].to_numpy(float); hi = bv.loc[order_v, "mae_ci97.5"].to_numpy(float) - v_
@@ -404,11 +404,11 @@ def fig3():
               columnspacing=1.2, borderaxespad=0.2)
     plabel(ax, "b", pad=0.065)
 
-    # c, d: extremum timing and maximum-value parity, with the same size and columns as the two panels of a
+    # c, d: extremum timing and maximum-value parity; their y axes sit at the same x positions as those of the two panels of a
     # c: extremum timing
     et = sheet("fig3_extremum_timing").pivot(index="offset_years", columns="extremum", values="trajectories_%")
     offs = [-30, -20, -10, 0, 10, 20, 30]
-    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.085, right=0.385, top=0.365, bottom=0.185)[0, 0]); xo = np.arange(len(offs)); w = 0.38
+    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.085, right=0.330, top=0.365, bottom=0.185)[0, 0]); xo = np.arange(len(offs)); w = 0.38
     pk = [float(et.loc[k, "maximum"]) for k in offs]; tr = [float(et.loc[k, "minimum"]) for k in offs]
     ax.bar(xo - w / 2, pk, w, color=SYN, zorder=3, label="Maximum")
     ax.bar(xo + w / 2, tr, w, color=GOLD, zorder=3, label="Minimum")
@@ -422,22 +422,21 @@ def fig3():
     ax.set_xlim(-0.6, len(offs) - 0.4); ax.set_ylim(0, 137); set_yticks2(ax, [0, 25, 50, 75, 100], dec=0)
     ax.set_xlabel("Synthetic minus AR6 extremum year (yr)"); ax.set_ylabel("Trajectories (%)")
     ax.legend(frameon=False, fontsize=5.8, loc="center left", bbox_to_anchor=(0.0, 0.52), handlelength=1.0, labelspacing=0.35, borderaxespad=0.2)
-    ax.set_title("Extremum timing", pad=8, fontsize=7.5); plabel(ax, "c", pad=0.065); col_l.append(ax)
+    ax.set_title("Extremum timing", pad=8, fontsize=7.5); plabel(ax, "c", pad=0.065)
 
     # d: maximum-value parity
     pk_ = sheet("fig3_maximum_parity"); gpk = pk_.ar6_maximum.to_numpy(float); ppk = pk_.synthetic_maximum.to_numpy(float)
     st = sheet("fig3_maximum_statistics").set_index("quantity").value
-    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.585, right=0.885, top=0.365, bottom=0.185)[0, 0]); hi_ = 150
+    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.585, right=0.774, top=0.365, bottom=0.185)[0, 0]); hi_ = 150
     ax.plot([0, hi_], [0, hi_], color=INK, lw=0.8, ls=(0, (3, 2)), zorder=6)
     ax.scatter(gpk, ppk, s=4, color=SYN, alpha=0.30, linewidths=0, zorder=3, rasterized=True)
-    ax.set_xlim(-3, hi_); ax.set_ylim(-3, hi_)
+    ax.set_xlim(-3, hi_); ax.set_ylim(-3, hi_); ax.set_aspect("equal", adjustable="box", anchor="W")
     for axis in (ax.xaxis, ax.yaxis):
         axis.set_major_locator(mticker.FixedLocator([0, 50, 100, 150])); axis.set_major_formatter(mticker.FixedFormatter(["0", "50", "100", "150"]))
     ax.set_xlabel("AR6 maximum (EJ yr$^{-1}$)"); ax.set_ylabel("Synthetic maximum (EJ yr$^{-1}$)", labelpad=1)
     ax.text(0.04, 0.96, f"median rel. error {100 * float(st['maximum_median_relative_error']):.1f}%\n$R^2$ = {float(st['maximum_r2']):.3f}", transform=ax.transAxes,
             ha="left", va="top", fontsize=5.4, color=INK, linespacing=1.25)
-    ax.set_title("Maximum value", pad=8, fontsize=7.5); plabel(ax, "d", pad=0.065); col_r.append(ax)
-    fig.align_ylabels(col_l); fig.align_ylabels(col_r)
+    ax.set_title("Maximum value", pad=8, fontsize=7.5); plabel(ax, "d", pad=0.065)
     save(fig, "fig3_fidelity")
 
 # ══════════════════════════════════ fig 4: generalisation of Qwen3.5-9B ═════
