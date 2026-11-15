@@ -1106,7 +1106,7 @@ def sheet_error_by_variable(gt_test):
 
 
 def sheet_error_by_year(gt_test):
-    """Supplementary Fig. S6: test-set error of the four methods in each year
+    """Supplementary Fig. S6a: test-set error of the four methods in each year
     (all variables pooled). The figure shows the finetuned model."""
     out = _boot_by(_pointwise(gt_test), "year")
     return out.sort_values(["method", "year"]).reset_index(drop=True)
@@ -1386,6 +1386,21 @@ def sheet_envelopes(gt_test):
                              syn_p10=qs[0], syn_median=qs[1], syn_p90=qs[2], median_diff_syn_minus_ar6=qs[1] - qa[1]))
     return pd.DataFrame(rows)
 
+def sheet_all_values(gt_test):
+    """Supplementary Fig. S6b: pooled statistics over all 248,050 decadal values (24,805 trajectories x 10 decades)."""
+    m = _test_pairs(gt_test)
+    xa = m[[f"{y}_ar6" for y in YEARS]].to_numpy(float).ravel(); xs = m[[f"{y}_syn" for y in YEARS]].to_numpy(float).ravel()
+    e = np.abs(xs - xa)
+    return pd.DataFrame([dict(quantity="n_values", value=len(e)),
+                         dict(quantity="median_abs_error_EJ", value=float(np.median(e))),
+                         dict(quantity="share_within_0.1_EJ", value=float((e <= 0.1).mean())),
+                         dict(quantity="share_within_0.5_EJ", value=float((e <= 0.5).mean())),
+                         dict(quantity="share_within_1_EJ", value=float((e <= 1.0).mean())),
+                         dict(quantity="pooled_pearson_r", value=float(np.corrcoef(xa, xs)[0, 1])),
+                         dict(quantity="pooled_pearson_r_log10_plus_0.01", value=float(np.corrcoef(np.log10(xa + 0.01), np.log10(xs + 0.01))[0, 1])),
+                         dict(quantity="pred_file", value=TEST_PREDS[TEST_PREDS_QWEN])])
+
+
 HELDOUT_CELLS = [("MESSAGEix-GLOBIOM", "EN_NPi2020_500f", "differs"), ("GEM-E3", "EN_INDCi2030_600f", "differs"),
                  ("WITCH", "EN_NPi2020_600f", "within"), ("COFFEE", "EN_NPi2100", "within")]
 _PRIM = ["Primary Energy|Coal|w/ CCS", "Primary Energy|Coal|w/o CCS", "Primary Energy|Gas|w/ CCS", "Primary Energy|Gas|w/o CCS",
@@ -1520,6 +1535,24 @@ def fig3_groups(c):
 def fig3_error(c):
     d = _memo(c, "fig3_error_by_variable"); d = d[d.method.eq(TEST_PREDS_QWEN)]
     return d[["variable", "mae", "mae_ci2.5", "mae_ci97.5", "smape_%", "smape_ci2.5", "smape_ci97.5"]].reset_index(drop=True)
+
+DENSITY_GRIDSIZE = 55
+
+def value_density(m):
+    """Supplementary Fig. S6b: all decadal values of the test set, AR6 against
+    synthetic, counted on the hexagonal grid of the figure. Axes are
+    log10(value + 0.01). `m` is the table of _test_pairs. Returns (bins, grid)."""
+    from matplotlib.figure import Figure
+    xa = m[[f"{y}_ar6" for y in YEARS]].to_numpy(float).ravel(); xs = m[[f"{y}_syn" for y in YEARS]].to_numpy(float).ravel()
+    ok = np.isfinite(xa) & np.isfinite(xs); f = lambda v: np.log10(np.clip(v, 0, None) + 0.01)
+    xa, xs = f(xa[ok]), f(xs[ok])
+    hb = Figure().subplots().hexbin(xa, xs, gridsize=DENSITY_GRIDSIZE, mincnt=1)
+    off = hb.get_offsets(); cnt = np.asarray(hb.get_array()).astype(int)
+    assert cnt.sum() == len(xa)
+    bins = pd.DataFrame({"ar6_log10": off[:, 0], "synthetic_log10": off[:, 1], "n_values": cnt})
+    grid = pd.DataFrame([{"gridsize": DENSITY_GRIDSIZE, "ar6_log10_min": xa.min(), "ar6_log10_max": xa.max(),
+                          "synthetic_log10_min": xs.min(), "synthetic_log10_max": xs.max()}])
+    return bins, grid
 
 TIMING_OFFSETS = [-30, -20, -10, 0, 10, 20, 30]
 
