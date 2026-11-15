@@ -2,7 +2,7 @@
 build_si_data.py
 ────────────────
 Compute the data behind the Supplementary figures into si_figure_data.xlsx:
-one sheet per Supplementary figure (FigS1 .. FigS6), holding the data tables of
+one sheet per Supplementary figure (FigS1 .. FigS5), holding the data tables of
 that figure one below the other (title row, header, rows, then an empty row).
 A table holds exactly what the panel draws; make_si_figs.py plots the tables
 without further computation. Scoring code and the workbook writer come from
@@ -32,14 +32,12 @@ SI_STAT_BUILDERS = {
     "figS2_reference_all_test":   ("s2ref",  lambda c: B.sheet7().query("group == 'ALL test'").reset_index(drop=True)),
     # ── Supplementary Fig. S3: scenario coverage (same data as Fig. 4a) ───────
     "figS3_scenario_coverage":    ("s3cov",  lambda c: B.sheet_coverage()),
-    # ── Supplementary Fig. S4: trajectories of all 22 variables ──────────────
-    "figS4_envelopes":            ("s4env",  lambda c: B.sheet_envelopes(c["gt_test"])),
-    # ── Supplementary Fig. S5: distributions in 2050 and 2100 ────────────────
-    "figS5_box_quartiles":        ("s5box",  lambda c: B.sheet_box_quartiles(c["gt_test"])),
-    # ── Supplementary Fig. S6: error by year and all decadal values ──────────
-    "figS6_error_by_year":        ("s6year", lambda c: B.sheet_error_by_year(c["gt_test"])),
-    "figS6_test_trajectories":    ("s6val",  lambda c: B._test_pairs(c["gt_test"])),
-    "figS6_all_values":           ("s6val",  lambda c: B.sheet_all_values(c["gt_test"])),
+    # ── Supplementary Fig. S4: distributions in 2050 and 2100 ────────────────
+    "figS4_box_quartiles":        ("s4box",  lambda c: B.sheet_box_quartiles(c["gt_test"])),
+    # ── Supplementary Fig. S5: error by year and all decadal values ──────────
+    "figS5_error_by_year":        ("s5year", lambda c: B.sheet_error_by_year(c["gt_test"])),
+    "figS5_test_trajectories":    ("s5val",  lambda c: B._test_pairs(c["gt_test"])),
+    "figS5_all_values":           ("s5val",  lambda c: B.sheet_all_values(c["gt_test"])),
     # ── numbers reported in the Supplementary tables and text ────────────────
     "consistency_checks": ("cons",   lambda c: B.sheet_constraints(c["gt_test"])),
     "cost_time":         ("cost",   lambda c: B.sheet6()),
@@ -72,13 +70,13 @@ def figS3_coverage(c):
     d = _s(c, "figS3_scenario_coverage")
     return d[d.level.isin(["dimension", "family"])][["level", "dimension", "model_family", "n_scenarios"]].reset_index(drop=True)
 
-def figS6_year(c):
-    d = _s(c, "figS6_error_by_year"); d = d[d.method.eq(B.TEST_PREDS_QWEN)]
+def figS5_year(c):
+    d = _s(c, "figS5_error_by_year"); d = d[d.method.eq(B.TEST_PREDS_QWEN)]
     return d[["year", "mae", "mae_ci2.5", "mae_ci97.5", "smape_%", "smape_ci2.5", "smape_ci97.5"]].reset_index(drop=True)
 
 def _density(c):
     """Panel b: hexagonal bin counts of all decadal values, computed once per run."""
-    if "_density" not in c: c["_density"] = B.value_density(_s(c, "figS6_test_trajectories"))
+    if "_density" not in c: c["_density"] = B.value_density(_s(c, "figS5_test_trajectories"))
     return c["_density"]
 
 SI_BUILDERS = {
@@ -88,11 +86,10 @@ SI_BUILDERS = {
     "figS2_region_metrics":       ("figS2", lambda c: _s(c, "figS2_region_metrics")[["region", "mae", "smape_%"]]),
     "figS2_reference_all_test":   ("figS2", lambda c: _s(c, "figS2_reference_all_test")[["mae", "smape_%"]]),
     "figS3_scenario_coverage":    ("figS3", figS3_coverage),
-    "figS4_envelopes":            ("figS4", lambda c: _s(c, "figS4_envelopes").drop(columns=["median_diff_syn_minus_ar6"])),
-    "figS5_box_quartiles":        ("figS5", lambda c: _s(c, "figS5_box_quartiles").drop(columns=["n_cases"])),
-    "figS6_error_by_year":        ("figS6", figS6_year),
-    "figS6_value_density":        ("figS6", lambda c: _density(c)[0]),
-    "figS6_value_density_grid":   ("figS6", lambda c: _density(c)[1]),
+    "figS4_box_quartiles":        ("figS4", lambda c: _s(c, "figS4_box_quartiles").drop(columns=["n_cases"])),
+    "figS5_error_by_year":        ("figS5", figS5_year),
+    "figS5_value_density":        ("figS5", lambda c: _density(c)[0]),
+    "figS5_value_density_grid":   ("figS5", lambda c: _density(c)[1]),
 }
 SI_TITLES = {   # block -> title row of its table in the workbook
     "figS1_knn_sweep":          "Supplementary Fig. S1a and b. Validation MAE of the KNN baseline for each k and α under uniform and similarity weights. The selected setting is marked.",
@@ -101,19 +98,17 @@ SI_TITLES = {   # block -> title row of its table in the workbook
     "figS2_region_metrics":     "Supplementary Fig. S2a and b. Test-set MAE and sMAPE of the finetuned model for each R10 region.",
     "figS2_reference_all_test": "Supplementary Fig. S2a and b. Test-set MAE and sMAPE over all cases, drawn as the dashed reference lines.",
     "figS3_scenario_coverage":  "Supplementary Fig. S3a and b. Number of scenarios for each design dimension and for each IAM family.",
-    "figS4_envelopes":          "Supplementary Fig. S4. The 10th, 50th and 90th percentiles across test cases for each variable and year, for AR6 and synthetic trajectories (EJ yr⁻¹).",
-    "figS5_box_quartiles":      "Supplementary Fig. S5a and b. Box statistics of the 2050 and 2100 values of all 22 variables, for AR6 and synthetic trajectories. Values below 0.01 EJ yr⁻¹ were set to 0.01 EJ yr⁻¹.",
-    "figS6_error_by_year":      "Supplementary Fig. S6a. Test-set MAE and sMAPE of the finetuned model in each year, with bootstrap 95% confidence intervals.",
-    "figS6_value_density":      "Supplementary Fig. S6b. Number of decadal values in each hexagonal bin. Bin centres are given as the base-10 logarithm of the value in EJ yr⁻¹ plus 0.01.",
-    "figS6_value_density_grid": "Supplementary Fig. S6b. Hexagonal grid of the density panel.",
+    "figS4_box_quartiles":      "Supplementary Fig. S4a and b. Box statistics of the 2050 and 2100 values of all 22 variables, for AR6 and synthetic trajectories. Values below 0.01 EJ yr⁻¹ were set to 0.01 EJ yr⁻¹.",
+    "figS5_error_by_year":      "Supplementary Fig. S5a. Test-set MAE and sMAPE of the finetuned model in each year, with bootstrap 95% confidence intervals.",
+    "figS5_value_density":      "Supplementary Fig. S5b. Number of decadal values in each hexagonal bin. Bin centres are given as the base-10 logarithm of the value in EJ yr⁻¹ plus 0.01.",
+    "figS5_value_density_grid": "Supplementary Fig. S5b. Hexagonal grid of the density panel.",
 }
 SI_STAT_LAYOUT = {   # sheet -> [(block, where it is reported, description)]
     "FigS1": [("figS1_knn_sweep", "a, b", ""), ("figS1_cvae_sweep", "c", ""), ("figS1_ft9b_lr_val", "d", "")],
     "FigS2": [("figS2_region_metrics", "a, b", ""), ("figS2_reference_all_test", "a, b", "")],
     "FigS3": [("figS3_scenario_coverage", "a, b", "")],
-    "FigS4": [("figS4_envelopes", "", "")],
-    "FigS5": [("figS5_box_quartiles", "a, b", "")],
-    "FigS6": [("figS6_error_by_year", "a", ""), ("figS6_test_trajectories", "b", ""), ("figS6_all_values", "b", "")],
+    "FigS4": [("figS4_box_quartiles", "a, b", "")],
+    "FigS5": [("figS5_error_by_year", "a", ""), ("figS5_test_trajectories", "b", ""), ("figS5_all_values", "b", "")],
     "Tables": [("consistency_checks", "Table S9", "sectoral consistency checks on the generated trajectories"),
                ("cost_time", "Table S10", "run time and cost per method"),
                ("neighbour_statistics", "Text S5", "neighbour availability in the retrieval step")],

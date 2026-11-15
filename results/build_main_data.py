@@ -1106,7 +1106,7 @@ def sheet_error_by_variable(gt_test):
 
 
 def sheet_error_by_year(gt_test):
-    """Supplementary Fig. S6a: test-set error of the four methods in each year
+    """Supplementary Fig. S5a: test-set error of the four methods in each year
     (all variables pooled). The figure shows the finetuned model."""
     out = _boot_by(_pointwise(gt_test), "year")
     return out.sort_values(["method", "year"]).reset_index(drop=True)
@@ -1305,7 +1305,7 @@ def _qwen_pred():
 
 
 def sheet_box_quartiles(gt_test):
-    """Supplementary Fig. S5: per variable, year (2050, 2100) and source (AR6 / synthetic),
+    """Supplementary Fig. S4: per variable, year (2050, 2100) and source (AR6 / synthetic),
     the box statistics drawn in the figure - Q1, median, Q3 and the whisker
     ends (last value inside 1.5 IQR) - on the same test cases (values below
     0.01 EJ/yr are clipped to 0.01 before the statistics, as in the plot)."""
@@ -1373,21 +1373,8 @@ def _test_pairs(gt_test):
     assert len(m) == len(gt_test), (len(m), len(gt_test))
     return m.reset_index(drop=True)
 
-def sheet_envelopes(gt_test):
-    """Supplementary Fig. S4: per variable x year x source the 10th / 50th / 90th
-    percentiles across test cases, and the synthetic-minus-AR6 difference of the medians."""
-    m = _test_pairs(gt_test); rows = []
-    for v in sorted(m.variable.unique()):
-        d = m[m.variable.eq(v)]
-        for y in YEARS:
-            a = d[f"{y}_ar6"].to_numpy(float); s = d[f"{y}_syn"].to_numpy(float)
-            qa = np.percentile(a, [10, 50, 90]); qs = np.percentile(s, [10, 50, 90])
-            rows.append(dict(variable=v, year=int(y), n_cases=len(d), ar6_p10=qa[0], ar6_median=qa[1], ar6_p90=qa[2],
-                             syn_p10=qs[0], syn_median=qs[1], syn_p90=qs[2], median_diff_syn_minus_ar6=qs[1] - qa[1]))
-    return pd.DataFrame(rows)
-
 def sheet_all_values(gt_test):
-    """Supplementary Fig. S6b: pooled statistics over all 248,050 decadal values (24,805 trajectories x 10 decades)."""
+    """Supplementary Fig. S5b: pooled statistics over all 248,050 decadal values (24,805 trajectories x 10 decades)."""
     m = _test_pairs(gt_test)
     xa = m[[f"{y}_ar6" for y in YEARS]].to_numpy(float).ravel(); xs = m[[f"{y}_syn" for y in YEARS]].to_numpy(float).ravel()
     e = np.abs(xs - xa)
@@ -1539,7 +1526,7 @@ def fig3_error(c):
 DENSITY_GRIDSIZE = 55
 
 def value_density(m):
-    """Supplementary Fig. S6b: all decadal values of the test set, AR6 against
+    """Supplementary Fig. S5b: all decadal values of the test set, AR6 against
     synthetic, counted on the hexagonal grid of the figure. Axes are
     log10(value + 0.01). `m` is the table of _test_pairs. Returns (bins, grid)."""
     from matplotlib.figure import Figure

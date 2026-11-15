@@ -7,10 +7,9 @@ helpers come from make_main_figs.py.
   figS1_hyperparam       hyper-parameter sweeps (KNN, cVAE, finetuned Qwen3.5-9B)
   figS2_region           per-region test accuracy of the finetuned model
   figS3_coverage         scenarios per design dimension and per IAM family
-  figS4_trajectories     medians and percentile ranges of all 22 variables over time
-  figS5_distributions    distributions of all 22 variables in 2050 and 2100
-  figS6_year_values      error of the finetuned model by year; all decadal values
-Usage:  python3 make_si_figs.py [S1 S2 S3 S4 S5 S6]
+  figS4_distributions    distributions of all 22 variables in 2050 and 2100
+  figS5_year_values      error of the finetuned model by year; all decadal values
+Usage:  python3 make_si_figs.py [S1 S2 S3 S4 S5]
 """
 import sys
 from pathlib import Path
@@ -38,9 +37,8 @@ SI_BLOCKS = {
     "FigS1": ["figS1_knn_sweep", "figS1_cvae_sweep", "figS1_ft9b_lr_val"],
     "FigS2": ["figS2_region_metrics", "figS2_reference_all_test"],
     "FigS3": ["figS3_scenario_coverage"],
-    "FigS4": ["figS4_envelopes"],
-    "FigS5": ["figS5_box_quartiles"],
-    "FigS6": ["figS6_error_by_year", "figS6_value_density", "figS6_value_density_grid"],
+    "FigS4": ["figS4_box_quartiles"],
+    "FigS5": ["figS5_error_by_year", "figS5_value_density", "figS5_value_density_grid"],
 }
 _NAMES[SI_XLSX] = SI_BLOCKS
 
@@ -213,38 +211,10 @@ def figS3():
     save(fig, "figS3_coverage")
 
 
-# ═══════════════════════ fig S4: 2100 distributions and total energy per case ══
+# ═══════════════════════════ fig S4: distributions in 2050 and 2100 ═════════
 def figS4():
-    """Medians and 10th-90th percentile ranges across test cases over 2010-2100
-    for each of the 22 variables, AR6 vs synthetic."""
-    env = si_sheet("figS4_envelopes")
-    PE = sorted(v for v in env.variable.unique() if v.startswith("Primary")); FE = sorted(v for v in env.variable.unique() if v.startswith("Final"))
-    fig = plt.figure(figsize=(185 * MM, 160 * MM))
-    for g, (group, vars_, top, bottom) in enumerate((("Primary energy", PE, 0.930, 0.580), ("Final energy", FE, 0.472, 0.122))):
-        gs = fig.add_gridspec(2, 6, left=0.085, right=0.985, top=top, bottom=bottom, wspace=0.52, hspace=0.66)
-        n_cases = int(env[env.variable.eq(vars_[0])].n_cases.iloc[0]); assert env[env.variable.isin(vars_)].n_cases.eq(n_cases).all()
-        fig.text(0.085, top + 0.027, f"{group} (n = {n_cases:,} cases)", fontsize=6.6, color=MUTED, ha="left", va="bottom")
-        for i, v in enumerate(vars_):
-            ax = fig.add_subplot(gs[i // 6, i % 6]); e_ = env[env.variable.eq(v)].sort_values("year"); yrs = e_.year.to_numpy(int)
-            ax.fill_between(yrs, e_.syn_p10, e_.syn_p90, color=TEALS[1], alpha=0.55, lw=0, zorder=2)
-            ax.plot(yrs, e_.syn_median, color=SYN, lw=1.4, zorder=5)
-            for q in ("ar6_p10", "ar6_p90"): ax.plot(yrs, e_[q], color=AR6_C, lw=0.6, ls=(0, (2, 1.4)), zorder=4)
-            ax.plot(yrs, e_.ar6_median, color=AR6_C, lw=1.0, ls=(0, (2.6, 1.8)), zorder=6)
-            ax.set_ylim(0, max(float(max(e_.ar6_p90.max(), e_.syn_p90.max())) * 1.12, 0.05)); ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=3))
-            ax.set_xlim(2008, 2102); ax.set_xticks([2020, 2060, 2100]); ax.tick_params(labelsize=5.2, pad=1.5)
-            ax.set_title(_short_var(v), fontsize=6.0, pad=3, loc="left")
-            if i % 6 == 0: ax.set_ylabel("EJ yr$^{-1}$", fontsize=6, labelpad=2)
-            if g == 1 and i // 6 == 1: ax.set_xlabel("Year", fontsize=6, labelpad=1.5)
-    hB = [Rectangle((0, 0), 1, 1, color=TEALS[1], alpha=0.55), plt.Line2D([], [], color=SYN, lw=1.4),
-          plt.Line2D([], [], color=AR6_C, lw=0.6, ls=(0, (2, 1.4))), plt.Line2D([], [], color=AR6_C, lw=1.0, ls=(0, (2.6, 1.8)))]
-    fig.legend(hB, ["Synthetic, 10th–90th percentile", "Synthetic median", "AR6, 10th and 90th percentile", "AR6 median"], frameon=False,
-               loc="upper center", bbox_to_anchor=(0.54, 0.050), ncol=4, fontsize=5.8, handlelength=1.6, columnspacing=1.4)
-    save(fig, "figS4_trajectories")
-
-
-def figS5():
     """AR6 vs synthetic distributions of all 22 variables in 2050 (a) and 2100 (b)."""
-    bq = si_sheet("figS5_box_quartiles")
+    bq = si_sheet("figS4_box_quartiles")
     PE = sorted(v for v in bq.variable.unique() if v.startswith("Primary")); FE = sorted(v for v in bq.variable.unique() if v.startswith("Final")); order_v = PE + FE
     xv = np.arange(len(order_v))
     fig = plt.figure(figsize=(185 * MM, 100 * MM))
@@ -268,13 +238,14 @@ def figS5():
         else:
             ax.set_xticklabels([_short_var(v) for v in order_v], fontsize=5.4, rotation=32, ha="right", rotation_mode="anchor")
         plabel(ax, "ab"[j], pad=0.065)
-    save(fig, "figS5_distributions")
+    save(fig, "figS4_distributions")
 
 
-def figS6():
+# ═══════════════════ fig S5: error by year and all decadal values ═══════════
+def figS5():
     """a, test-set MAE and sMAPE of the finetuned model in each year (same marks
     as Fig. 3b); b, all decadal values of the test set, AR6 vs synthetic."""
-    ey = si_sheet("figS6_error_by_year").sort_values("year"); x = ey.year.to_numpy(int)
+    ey = si_sheet("figS5_error_by_year").sort_values("year"); x = ey.year.to_numpy(int)
     fig = plt.figure(figsize=(185 * MM, 70 * MM))
     # a: error by year
     ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.075, right=0.455, top=0.900, bottom=0.190)[0, 0]); axr = ax.twinx()
@@ -292,7 +263,7 @@ def figS6():
               ["MAE (left axis)", "sMAPE (right axis)"], frameon=False, fontsize=5.8, loc="upper left", handlelength=1.1, labelspacing=0.35, borderaxespad=0.2)
     plabel(ax, "a", pad=0.060, yscale=1.10)
     # b: hexbin of all decadal values (log10(v + 0.01))
-    dn = si_sheet("figS6_value_density"); g_ = si_sheet("figS6_value_density_grid").iloc[0]
+    dn = si_sheet("figS5_value_density"); g_ = si_sheet("figS5_value_density_grid").iloc[0]
     ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.640, right=0.910, top=0.900, bottom=0.190)[0, 0]); f = lambda v: np.log10(np.clip(v, 0, None) + 0.01)
     hb = ax.hexbin(dn.ar6_log10, dn.synthetic_log10, C=dn.n_values, reduce_C_function=np.sum, gridsize=int(g_.gridsize),
                    extent=(g_.ar6_log10_min, g_.ar6_log10_max, g_.synthetic_log10_min, g_.synthetic_log10_max),
@@ -308,11 +279,11 @@ def figS6():
     cb.set_ticks([1, 10, 100, 1000, 10000]); cb.set_ticklabels(["1", "10", "100", "1,000", "10,000"]); cb.ax.minorticks_off()
     cb.set_label("Number of values per bin", fontsize=5.8, labelpad=2); cb.outline.set_linewidth(0.4)
     plabel(ax, "b", pad=0.075, yscale=1.10)
-    save(fig, "figS6_year_values")
+    save(fig, "figS5_year_values")
 
 
 if __name__ == "__main__":
-    which = sys.argv[1:] or ["S1", "S2", "S3", "S4", "S5", "S6"]
+    which = sys.argv[1:] or ["S1", "S2", "S3", "S4", "S5"]
     for w in which:
-        {"S1": figS1, "S2": figS2, "S3": figS3, "S4": figS4, "S5": figS5, "S6": figS6}[w]()
+        {"S1": figS1, "S2": figS2, "S3": figS3, "S4": figS4, "S5": figS5}[w]()
     print("SI figures written to", _HERE)
