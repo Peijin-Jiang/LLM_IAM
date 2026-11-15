@@ -1,7 +1,7 @@
 # Exploring energy pathways of climate mitigation scenarios with large language models
 
 ## Project Overview
-This repository contains the code and source data of a knowledge-guided large language model (LLM) framework that generates synthetic energy system trajectories for specified IAM family–scenario combinations. The framework draws on the IPCC AR6 Scenarios Database (22 energy variables, ten R10 regions, 372 scenarios and nine IAM families). LLM agents extract scenario descriptions and model fingerprints from the literature. For each target, the framework retrieves similar cases, and a finetuned open-weight LLM (Qwen3.5-9B) generates the trajectories.
+This repository contains the code and source data of a knowledge-guided large language model (LLM) framework that generates synthetic energy system trajectories for specified IAM family–scenario combinations. The framework draws on the IPCC AR6 Scenarios Database (22 energy variables, ten R10 regions, 372 scenarios and 9 IAM families). LLM agents extract scenario descriptions and model fingerprints from the literature. For each target, the framework retrieves similar cases, and a finetuned open-weight LLM (Qwen3.5-9B) generates the trajectories.
 
 ![Framework Overview](Figure/overview.png)
 
@@ -20,7 +20,7 @@ pip install -r requirements.txt
 Finetuning and inference run on a GPU (see the notebooks in `finetune/`). The extraction, reranking and zero-shot RAG steps call the OpenAI and Gemini APIs (`OPENAI_API_KEY`, `GEMINI_API_KEY`).
 
 ### 3. Data Availability
-The AR6 Scenarios Database is not redistributed here. `make_datasets/build_r10_sd_mixed.py` downloads the required data from IIASA (https://iiasa.ac.at/models-tools-data/ar6-scenario-explorer-and-database). The source documents are listed in `scenario_des/literature/literature_index.csv` and `fingerprint/iam_study/iam_study_index.csv`. The data drawn in the figures are in `results/main_figure_data.xlsx` and `results/si_figure_data.xlsx`.
+The AR6 Scenarios Database is not redistributed here. It downloads the required data from IIASA (https://iiasa.ac.at/models-tools-data/ar6-scenario-explorer-and-database). 
 
 ## Repository Structure
 
