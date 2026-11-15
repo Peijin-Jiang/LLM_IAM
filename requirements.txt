@@ -1,0 +1,30 @@
+# data and analysis
+numpy
+pandas
+scipy
+scikit-learn
+openpyxl
+xlsxwriter
+matplotlib
+pyam-iamc
+tqdm
+joblib
+# literature processing and LLM APIs
+openai
+google-genai
+pypdf
+pymupdf
+bert-score
+# baseline models
+torch
+# finetuning (GPU runtime, see finetune/colab_finetune_qwen3.5-9b.ipynb)
+unsloth==2026.7.5
+unsloth_zoo==2026.7.6
+transformers==5.5.0
+trl==0.24.0
+peft
+datasets
+# inference (separate GPU runtime, see finetune/colab_infer_vllm.ipynb)
+# vLLM installs its own torch and transformers (the reported runs used transformers 5.15.1)
+vllm==0.28.0
+huggingface_hub
