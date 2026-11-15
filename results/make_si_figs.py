@@ -225,18 +225,18 @@ def figS4():
         fig.text(0.085, top + 0.027, f"{group} (n = {n_cases:,} cases)", fontsize=6.6, color=MUTED, ha="left", va="bottom")
         for i, v in enumerate(vars_):
             ax = fig.add_subplot(gs[i // 6, i % 6]); e_ = env[env.variable.eq(v)].sort_values("year"); yrs = e_.year.to_numpy(int)
-            ax.fill_between(yrs, e_.syn_p10, e_.syn_p90, color=TEALS[1], alpha=0.55, lw=0, zorder=2)
-            ax.plot(yrs, e_.syn_median, color=SYN, lw=1.4, zorder=5)
-            for q in ("ar6_p10", "ar6_p90"): ax.plot(yrs, e_[q], color=AR6_C, lw=0.6, ls=(0, (2, 1.4)), zorder=4)
-            ax.plot(yrs, e_.ar6_median, color=AR6_C, lw=1.0, ls=(0, (2.6, 1.8)), zorder=6)
+            ax.fill_between(yrs, e_.ar6_p10, e_.ar6_p90, color=GOLD_L, lw=0, zorder=2)                     # AR6: gold band and dashed median
+            ax.plot(yrs, e_.ar6_median, color=AR6_C, lw=1.2, ls=(0, (2.6, 1.8)), zorder=6)
+            for q in ("syn_p10", "syn_p90"): ax.plot(yrs, e_[q], color=SYN, lw=0.7, zorder=4)                # synthetic: teal lines
+            ax.plot(yrs, e_.syn_median, color=SYN, lw=1.5, zorder=5)
             ax.set_ylim(0, max(float(max(e_.ar6_p90.max(), e_.syn_p90.max())) * 1.12, 0.05)); ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=3))
             ax.set_xlim(2008, 2102); ax.set_xticks([2020, 2060, 2100]); ax.tick_params(labelsize=5.2, pad=1.5)
             ax.set_title(_short_var(v), fontsize=6.0, pad=3, loc="left")
             if i % 6 == 0: ax.set_ylabel("EJ yr$^{-1}$", fontsize=6, labelpad=2)
             if g == 1 and i // 6 == 1: ax.set_xlabel("Year", fontsize=6, labelpad=1.5)
-    hB = [Rectangle((0, 0), 1, 1, color=TEALS[1], alpha=0.55), plt.Line2D([], [], color=SYN, lw=1.4),
-          plt.Line2D([], [], color=AR6_C, lw=0.6, ls=(0, (2, 1.4))), plt.Line2D([], [], color=AR6_C, lw=1.0, ls=(0, (2.6, 1.8)))]
-    fig.legend(hB, ["Synthetic, 10th–90th percentile", "Synthetic median", "AR6, 10th and 90th percentile", "AR6 median"], frameon=False,
+    hB = [Rectangle((0, 0), 1, 1, color=GOLD_L), plt.Line2D([], [], color=AR6_C, lw=1.2, ls=(0, (2.6, 1.8))),
+          plt.Line2D([], [], color=SYN, lw=0.7), plt.Line2D([], [], color=SYN, lw=1.5)]
+    fig.legend(hB, ["AR6, 10th–90th percentile", "AR6 median", "Synthetic, 10th and 90th percentile", "Synthetic median"], frameon=False,
                loc="upper center", bbox_to_anchor=(0.54, 0.050), ncol=4, fontsize=5.8, handlelength=1.6, columnspacing=1.4)
     save(fig, "figS4_trajectories")
 

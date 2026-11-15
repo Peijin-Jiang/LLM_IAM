@@ -354,37 +354,38 @@ def box_stats(ax, x, lo, q1, med, q3, hi, face, edge, width=0.6, lw=0.7, z=3):
 YEARS = [str(y) for y in range(2010, 2101, 10)]
 
 def fig3():
-    fig = plt.figure(figsize=(185 * MM, 203 * MM))
-    # a: three groups of primary energy sources (top row) and the three final energy sectors (bottom row)
+    fig = plt.figure(figsize=(185 * MM, 194 * MM))
+    # a: three groups of primary energy sources (left) and the three final energy sectors (right), in one row
     gt_ = sheet("fig3_group_trajectories")
-    for r, (energy, top, bottom) in enumerate((("primary", 0.966, 0.848), ("final", 0.798, 0.680))):
-        gs_a = fig.add_gridspec(1, 3, left=0.085, right=0.985, top=top, bottom=bottom, wspace=0.42)
+    TITLES = {"Fossil fuels without CCS": "Fossil fuels\nwithout CCS", "Fossil fuels with CCS": "Fossil fuels\nwith CCS", "Non-fossil sources": "Non-fossil\nsources"}
+    for r, (energy, left, right) in enumerate((("primary", 0.085, 0.500), ("final", 0.570, 0.985))):
+        gs_a = fig.add_gridspec(1, 3, left=left, right=right, top=0.902, bottom=0.768, wspace=0.52)
         groups = list(dict.fromkeys(gt_[gt_.energy.eq(energy)].group))
+        n_cases = int(gt_[gt_.energy.eq(energy)].n_cases.iloc[0]); assert gt_[gt_.energy.eq(energy)].n_cases.eq(n_cases).all()
+        fig.text(left, 0.951, f"{'Primary' if energy == 'primary' else 'Final'} energy (n = {n_cases:,} cases)", fontsize=6.6, color=MUTED, ha="left", va="bottom")
         for i, g in enumerate(groups):
             ax = fig.add_subplot(gs_a[0, i]); d_ = gt_[gt_.group.eq(g)]
             dq = d_[d_.source.eq("synthetic")].set_index("year").sort_index(); da = d_[d_.source.eq("AR6")].set_index("year").sort_index()
-            ax.fill_between(dq.index, dq.p10, dq.p90, color=TEALS[1], alpha=0.55, lw=0, zorder=2)
-            ax.plot(dq.index, dq["median"], color=SYN, lw=1.7, zorder=5)
-            for q in ("p10", "p90"): ax.plot(da.index, da[q], color=AR6_C, lw=0.7, ls=(0, (2, 1.4)), zorder=4)
-            ax.plot(da.index, da["median"], color=AR6_C, lw=1.2, ls=(0, (2.6, 1.8)), zorder=6)
-            ax.set_ylim(0, 1.12 * float(max(dq.p90.max(), da.p90.max()))); ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=4, integer=True))
-            ax.set_xlim(2008, 2102); ax.set_xticks([2010, 2050, 2100]); ax.tick_params(labelsize=6.2, pad=1.5)
-            ax.set_title(g, fontsize=6.8, pad=3, loc="left")
-            if i == 0:
-                ax.set_ylabel(("Primary" if energy == "primary" else "Final") + " energy\n(EJ yr$^{-1}$)", fontsize=6.4, labelpad=2, linespacing=1.15)
-                ax.text(1.0, 1.035, f"n = {int(dq.n_cases.iloc[0]):,} cases", transform=ax.transAxes, ha="right", va="bottom", fontsize=5.0, color=MUTED)
-            if r == 1: ax.set_xlabel("Year", fontsize=6.4, labelpad=1.5)
-            if r == 0 and i == 0: plabel(ax, "a", pad=0.065, yscale=1.20)
-    hA = [Rectangle((0, 0), 1, 1, color=TEALS[1], alpha=0.55), plt.Line2D([], [], color=SYN, lw=1.7),
-          plt.Line2D([], [], color=AR6_C, lw=0.7, ls=(0, (2, 1.4))), plt.Line2D([], [], color=AR6_C, lw=1.2, ls=(0, (2.6, 1.8)))]
-    fig.legend(hA, ["Synthetic, 10th–90th percentile", "Synthetic median", "AR6, 10th and 90th percentile", "AR6 median"], frameon=False,
-               loc="upper center", bbox_to_anchor=(0.54, 0.635), ncol=4, fontsize=5.8, handlelength=1.6, columnspacing=1.3)
+            ax.fill_between(da.index, da.p10, da.p90, color=GOLD_L, lw=0, zorder=2)                        # AR6: gold band and dashed median
+            ax.plot(da.index, da["median"], color=AR6_C, lw=1.3, ls=(0, (2.6, 1.8)), zorder=6)
+            for q in ("p10", "p90"): ax.plot(dq.index, dq[q], color=SYN, lw=0.7, zorder=4)                     # synthetic: teal lines
+            ax.plot(dq.index, dq["median"], color=SYN, lw=1.6, zorder=5)
+            ax.set_ylim(0, 1.12 * float(max(dq.p90.max(), da.p90.max()))); ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=3, integer=True))
+            ax.set_xlim(2008, 2102); ax.set_xticks([2020, 2060, 2100]); ax.tick_params(labelsize=5.6, pad=1.5)
+            ax.set_title(TITLES.get(g, g), fontsize=6.4, pad=3, loc="left", linespacing=1.1)
+            ax.set_xlabel("Year", fontsize=6.2, labelpad=1.5)
+            if i == 0: ax.set_ylabel("EJ yr$^{-1}$", fontsize=6.2, labelpad=2)
+            if r == 0 and i == 0: plabel(ax, "a", pad=0.065, yscale=1.55)
+    hA = [Rectangle((0, 0), 1, 1, color=GOLD_L), plt.Line2D([], [], color=AR6_C, lw=1.3, ls=(0, (2.6, 1.8))),
+          plt.Line2D([], [], color=SYN, lw=0.7), plt.Line2D([], [], color=SYN, lw=1.6)]
+    fig.legend(hA, ["AR6, 10th–90th percentile", "AR6 median", "Synthetic, 10th and 90th percentile", "Synthetic median"], frameon=False,
+               loc="upper center", bbox_to_anchor=(0.535, 0.712), ncol=4, fontsize=5.8, handlelength=1.6, columnspacing=1.3)
 
     # b: per-variable MAE / sMAPE
     bv = sheet("fig3_error_by_variable").set_index("variable")
     PE = sorted(v for v in bv.index if v.startswith("Primary")); FE = sorted(v for v in bv.index if v.startswith("Final")); order_v = PE + FE
     xv = np.arange(len(order_v))
-    gs_b = fig.add_gridspec(1, 1, left=0.085, right=0.945, top=0.570, bottom=0.472)
+    gs_b = fig.add_gridspec(1, 1, left=0.085, right=0.945, top=0.640, bottom=0.495)
     SLATE = "#4E5A66"
     ax = fig.add_subplot(gs_b[0, 0]); axr = ax.twinx()
     axr.spines["top"].set_visible(False); axr.spines["right"].set_visible(True); axr.spines["right"].set_color(SLATE)
@@ -407,9 +408,8 @@ def fig3():
     plabel(ax, "b", pad=0.065)
 
     # c, d: all-values density parity and extremum timing
-    gs_c = fig.add_gridspec(1, 3, left=0.085, right=0.945, top=0.352, bottom=0.155, wspace=0, width_ratios=[1, 0.86, 1.72])   # column 1 is a spacer
     # c: hexbin of all decadal values (log10(v + 0.01))
-    ax = fig.add_subplot(gs_c[0, 0])
+    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.085, right=0.355, top=0.365, bottom=0.107)[0, 0])
     dn = sheet("fig3_value_density"); g_ = sheet("fig3_value_density_grid").iloc[0]
     f = lambda v: np.log10(np.clip(v, 0, None) + 0.01)
     hb = ax.hexbin(dn.ar6_log10, dn.synthetic_log10, C=dn.n_values, reduce_C_function=np.sum, gridsize=int(g_.gridsize),
@@ -432,7 +432,7 @@ def fig3():
     # d: extremum timing
     et = sheet("fig3_extremum_timing").pivot(index="offset_years", columns="extremum", values="trajectories_%")
     offs = [-30, -20, -10, 0, 10, 20, 30]
-    ax = fig.add_subplot(gs_c[0, 2]); xo = np.arange(len(offs)); w = 0.38
+    ax = fig.add_subplot(fig.add_gridspec(1, 1, left=0.585, right=0.945, top=0.365, bottom=0.107)[0, 0]); xo = np.arange(len(offs)); w = 0.38
     pk = [float(et.loc[k, "maximum"]) for k in offs]; tr = [float(et.loc[k, "minimum"]) for k in offs]
     ax.bar(xo - w / 2, pk, w, color=SYN, zorder=3, label="Maximum")
     ax.bar(xo + w / 2, tr, w, color=TEALS[1], zorder=3, label="Minimum")
