@@ -640,8 +640,12 @@ def fig4():
 
     import textwrap
     ex = sheet("fig4_contrast_examples")
-    TITLE_OVERRIDE = {("SSP2_noint_lc_15", "SSP2_noint_lc_50"):
-                      "Lower vs higher\ncarbon tax"}   # explicit line break: not re-wrapped
+    TITLE_OVERRIDE = {   # the one assumption that changes from the retrieved neighbour (B) to the test case (A)
+        ("SSP2_noint_lc_15", "SSP2_noint_lc_50"): "Carbon tax raised from\n15 to 50 USD per tCO$_2$",
+        ("EN_NPi2020_600f_COV", "EN_NPi2020_600f"): "COVID-19 recovery replaced\nby default recovery",
+        ("EN_NPi2020_800f", "EN_NPi2020_800"): "Net-negative CO$_2$ emissions\nno longer allowed",
+        ("R2p1_SSP1-NPi", "R2p1_SSP1-NDC"): "Current policies\nreplaced by NDCs",
+    }
     AR6_C, B_C = "#B9954A", "#8A949C"
     B_LS = (0, (1, 1.3))
     YRS = sorted(ex.year.unique())
@@ -667,10 +671,10 @@ def fig4():
         ax.set_title("\n".join(lines),
                      fontsize=6.6, pad=25, linespacing=1.1)
         PLAIN_PAIR = {
-            ("SSP2_noint_lc_15", "SSP2_noint_lc_50"): "carbon tax from 2030: 15 → 50 USD per tCO$_2$",
-            ("EN_NPi2020_600f_COV", "EN_NPi2020_600f"): "600 GtCO$_2$ budget: COVID-19 recovery → default",
-            ("EN_NPi2020_800f", "EN_NPi2020_800"): "800 GtCO$_2$ budget: overshoot allowed → net zero",
-            ("R2p1_SSP1-NPi", "R2p1_SSP1-NDC"): "SSP1: current policies → NDCs",
+            ("SSP2_noint_lc_15", "SSP2_noint_lc_50"): "Both scenarios: carbon tax from 2030",
+            ("EN_NPi2020_600f_COV", "EN_NPi2020_600f"): "Both scenarios: 600 GtCO$_2$ budget",
+            ("EN_NPi2020_800f", "EN_NPi2020_800"): "Both scenarios: 800 GtCO$_2$ budget",
+            ("R2p1_SSP1-NPi", "R2p1_SSP1-NDC"): "Both scenarios: SSP1",
         }
         ax.text(0.5, 1.03,
                 f"{r.model_family}, {REGION_SHORT.get(r.region, r.region)}\n"
@@ -689,8 +693,8 @@ def fig4():
                 plt.Line2D([], [], color=AR6_C, lw=1.3, ls=(0, (3, 1.5))),
                 plt.Line2D([], [], color=TEALS[4], lw=1.6),
                 plt.Rectangle((0, 0), 1, 1, color=AR6_C, alpha=0.14, lw=0)],
-               ["Training run (B), retrieved neighbour", "Test case, AR6 (A)",
-                "Test case, synthetic (A)", "AR6 change from B to A"],
+               ["Retrieved neighbour, AR6", "Test case, AR6",
+                "Test case, synthetic", "AR6 change from neighbour to test case"],
                frameon=False, loc="upper center", bbox_to_anchor=(0.5, 0.062),
                ncol=4, handlelength=2.0, columnspacing=1.8, fontsize=6)
 
