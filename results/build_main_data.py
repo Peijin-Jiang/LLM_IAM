@@ -1400,7 +1400,7 @@ HELDOUT_INDICATORS = [("pe_fossil_unab", "Fossil fuels without CCS (% of primary
                       ("bld_elec_share", "Electricity in buildings (% of final energy)"), ("tr_elec_share", "Electricity in transport (% of final energy)")]
 
 def _shares_2050(df, family, scenario, year="2050"):
-    """2050 shares of one family x scenario, summed over the R10 regions: the three groups of
+    """2050 shares of one family x scenario, summed over the regions in df: the three groups of
     primary energy sources of Fig. 3a (% of primary energy) and the electricity share of final
     energy in the three sectors of Fig. 3a."""
     d = df[(df.model_family == family) & (df.scenario == scenario)]
@@ -1418,22 +1418,28 @@ def _heldout_tables(gt_test):
     real = pd.read_excel(sorted((DATA_ROOT / "make_datasets" / "output").glob("AR6_R10_sd_mixed_*.xlsx"))[-1])
     real.columns = [str(c) for c in real.columns]
     pred = _qwen_pred()
+    if "region" not in pred.columns: pred = pred.assign(region=pred.id.map(gt_test.drop_duplicates("id").set_index("id").region))
     testc = set(map(tuple, gt_test[["model_family", "scenario"]].drop_duplicates().values))
     train = real[~real.set_index(["model_family", "scenario"]).index.isin(list(testc))]   # the other families' runs: training data only
     rows, cells = [], []
     for F, A, kind in HELDOUT_CELLS:
         assert (F, A) in testc, (F, A)
         others = sorted(g for g in train[train.scenario == A].model_family.unique() if g != F)
-        r, p = _shares_2050(gt_test, F, A), _shares_2050(pred, F, A)
+        # all families of a panel are compared on the same regions: those reported by the target family and by every other family
+        regs = set(gt_test[(gt_test.model_family == F) & (gt_test.scenario == A)].region)
+        for g in others: regs &= set(train[(train.model_family == g) & (train.scenario == A)].region)
+        assert regs, (F, A)
+        on = lambda d: d[d.region.isin(regs)]
+        r, p = _shares_2050(on(gt_test), F, A), _shares_2050(on(pred), F, A)
         for k, lab in HELDOUT_INDICATORS:
             if k not in r: continue
-            ov = {g: _shares_2050(train, g, A).get(k, np.nan) for g in others}; ov = {g: v for g, v in ov.items() if not np.isnan(v)}
+            ov = {g: _shares_2050(on(train), g, A).get(k, np.nan) for g in others}; ov = {g: v for g, v in ov.items() if not np.isnan(v)}
             if len(ov) < 1: continue
             for g, v in ov.items():
                 rows.append(dict(family=F, scenario=A, kind=kind, indicator=k, label=lab, series="other family", other_family=g, value=v))
             rows.append(dict(family=F, scenario=A, kind=kind, indicator=k, label=lab, series="synthetic", other_family="", value=p[k]))
             rows.append(dict(family=F, scenario=A, kind=kind, indicator=k, label=lab, series="AR6 truth", other_family="", value=r[k]))
-        cells.append(dict(family=F, scenario=A, kind=kind, n_other_families=len(others), other_families=", ".join(others)))
+        cells.append(dict(family=F, scenario=A, kind=kind, n_other_families=len(others), other_families=", ".join(others), n_regions=len(regs), regions="; ".join(sorted(regs))))
     return pd.DataFrame(rows), pd.DataFrame(cells)
 
 _HELDOUT_CACHE = {}
@@ -1631,7 +1637,7 @@ MAIN_TITLES = {   # block -> title row of its table in the workbook
     "fig4_group_metrics":       "Fig. 4c–f. Test-set metrics of the finetuned model for each group.",
     "fig4_reference_lines":     "Fig. 4c–f. Reference levels from AR6 data. The first is the scenario with the most similar description that the same IAM family evaluated in the same region. The second is the output of the other IAM families for the same scenario and region.",
     "fig4_contrast_examples":   "Fig. 4g–j. Training case B, AR6 test case A and synthetic test case A for the four examples that differ in one assumption (EJ yr⁻¹).",
-    "fig5_heldout_deviations":  "Fig. 5a–d. Shares in 2050 for four held-out combinations of IAM family and scenario, given as differences from the median of the other IAM families that evaluated the scenario (percentage points).",
+    "fig5_heldout_deviations":  "Fig. 5a–d. Shares in 2050 for four held-out combinations of IAM family and scenario, given as differences from the median of the other IAM families that evaluated the scenario (percentage points). Shares are calculated from the sum over the regions that all compared families reported for the scenario.",
 }
 
 def figure_layout(blocks, titles):
