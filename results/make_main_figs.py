@@ -237,11 +237,11 @@ def fig2():
     """a-c   RAG retrieval and prompt ablation (validation set); b is the
           k_m sweep scored only where a same-scenario neighbour exists.
     d-g   test-set accuracy of the four methods (bootstrap 95% CI)."""
-    fig = plt.figure(figsize=(185 * MM, 107 * MM))
+    fig = plt.figure(figsize=(185 * MM, 112 * MM))
     gs_r1 = fig.add_gridspec(1, 3, left=0.100, right=0.985,
-                             top=0.916, bottom=0.638, wspace=0.50)
+                             top=0.920, bottom=0.654, wspace=0.50)
     gs_r2 = fig.add_gridspec(1, 4, left=0.100, right=0.985,
-                             top=0.379, bottom=0.100, wspace=0.50)
+                             top=0.362, bottom=0.096, wspace=0.50)
 
     # ── a-c: RAG ablation ───────────────────────────────────────────────────
     df = sheet("fig2_rag_val_ablation")
@@ -298,6 +298,9 @@ def fig2():
     ax.set_title(f"Removing prompt components\n(n = {n_val})", pad=7,
                  fontsize=TFS)
     plabel(ax, "c", pad=0.045)
+    fig.legend([Rectangle((0, 0), 1, 1, color=ABL_D), Rectangle((0, 0), 1, 1, color=ABL_L)],
+               ["Adopted setting ($k_s$ = 2, $k_m$ = 1, full prompt)", "Other settings"], frameon=False, loc="center",
+               bbox_to_anchor=(0.5, 0.497), ncol=2, handlelength=1.1, columnspacing=1.8)
 
     # ── d-g: four-method test comparison ────────────────────────────────────
     dm = sheet("fig2_test_four_methods").copy()
