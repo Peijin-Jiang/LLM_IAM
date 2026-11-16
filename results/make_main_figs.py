@@ -732,7 +732,7 @@ def _heldout_row(fig, top, bottom, legend_y, letters="abcd"):
     Pf = sheet("fig5_heldout_deviations"); Cl = Pf[["family", "scenario"]].drop_duplicates()
     ORDER = ["pe_fossil_unab", "pe_fossil_ccs", "pe_nonfossil", "ind_elec_share", "bld_elec_share", "tr_elec_share"]
     SHORT = {"pe_fossil_unab": "Fossil w/o CCS", "pe_fossil_ccs": "Fossil w/ CCS", "pe_nonfossil": "Non-fossil",
-             "ind_elec_share": "Industry elec.", "bld_elec_share": "Buildings elec.", "tr_elec_share": "Transport elec."}
+             "ind_elec_share": "Industry", "bld_elec_share": "Buildings", "tr_elec_share": "Transport"}   # group header says electricity share
     def plain(scen):
         if scen == "EN_NPi2100": return "no carbon budget\nimplemented national policies continued"
         pre, bud, f = re.match(r"EN_(NPi2020|INDCi2030)_(\d+)(f?)", scen).groups()
