@@ -1395,24 +1395,23 @@ _PRIM = ["Primary Energy|Coal|w/ CCS", "Primary Energy|Coal|w/o CCS", "Primary E
          "Primary Energy|Nuclear", "Primary Energy|Biomass"]
 _FIN3 = ["Final Energy|Industry", "Final Energy|Transportation", "Final Energy|Residential and Commercial"]
 _ELE3 = [v + "|Electricity" for v in _FIN3]
-HELDOUT_INDICATORS = [("fossil_unab_share", "Fossil without CCS (% of PE)"), ("ccs_share", "Fossil with CCS (% of PE)"),
-                      ("sw_share", "Wind and solar (% of PE)"), ("bio_share", "Biomass (% of PE)"), ("nuc_share", "Nuclear (% of PE)"),
-                      ("FE_total", "Final energy (EJ)"), ("ind_elec_share", "Electricity in industry (%)"),
-                      ("tr_elec_share", "Electricity in transport (%)"), ("bld_elec_share", "Electricity in buildings (%)")]
+HELDOUT_INDICATORS = [("pe_fossil_unab", "Fossil fuels without CCS (% of primary energy)"), ("pe_fossil_ccs", "Fossil fuels with CCS (% of primary energy)"),
+                      ("pe_nonfossil", "Non-fossil sources (% of primary energy)"), ("ind_elec_share", "Electricity in industry (% of final energy)"),
+                      ("bld_elec_share", "Electricity in buildings (% of final energy)"), ("tr_elec_share", "Electricity in transport (% of final energy)")]
 
 def _shares_2050(df, family, scenario, year="2050"):
-    """2050 energy-system indicators of one family x scenario, summed over the R10 regions."""
+    """2050 shares of one family x scenario, summed over the R10 regions: the three groups of
+    primary energy sources of Fig. 3a (% of primary energy) and the electricity share of final
+    energy in the three sectors of Fig. 3a."""
     d = df[(df.model_family == family) & (df.scenario == scenario)]
     if d.empty: return {}
     g = lambda v: float(d[d.variable == v][year].sum())
-    pe = sum(g(v) for v in _PRIM); fe = sum(g(v) for v in _FIN3); o = {}
+    pe = sum(g(v) for v in _PRIM); o = {}
     if pe > 0:
-        o.update(fossil_unab_share=100 * (g(_PRIM[1]) + g(_PRIM[3]) + g(_PRIM[5])) / pe, sw_share=100 * (g(_PRIM[6]) + g(_PRIM[7])) / pe,
-                 bio_share=100 * g(_PRIM[10]) / pe, ccs_share=100 * (g(_PRIM[0]) + g(_PRIM[2]) + g(_PRIM[4])) / pe, nuc_share=100 * g(_PRIM[9]) / pe)
-    if fe > 0:
-        o["FE_total"] = fe
-        for sec, (fv, ev) in {"ind": (_FIN3[0], _ELE3[0]), "tr": (_FIN3[1], _ELE3[1]), "bld": (_FIN3[2], _ELE3[2])}.items():
-            if g(fv) > 0: o[f"{sec}_elec_share"] = 100 * g(ev) / g(fv)
+        o.update(pe_fossil_unab=100 * (g(_PRIM[1]) + g(_PRIM[3]) + g(_PRIM[5])) / pe, pe_fossil_ccs=100 * (g(_PRIM[0]) + g(_PRIM[2]) + g(_PRIM[4])) / pe,
+                 pe_nonfossil=100 * sum(g(v) for v in _PRIM[6:]) / pe)
+    for sec, (fv, ev) in {"ind": (_FIN3[0], _ELE3[0]), "tr": (_FIN3[1], _ELE3[1]), "bld": (_FIN3[2], _ELE3[2])}.items():
+        if g(fv) > 0: o[f"{sec}_elec_share"] = 100 * g(ev) / g(fv)
     return o
 
 def _heldout_tables(gt_test):
@@ -1585,8 +1584,8 @@ def fig4_contrast(c):
                                                "test_scenario_A", "series", "year", "value"]]
 
 def fig5_heldout(c):
-    """2050 indicators as deviations from the median of the other IAM families that ran the
-    scenario: percentage points for shares, per cent for total final energy."""
+    """2050 shares as differences from the median of the other IAM families that ran the
+    scenario, in percentage points."""
     P = _memo(c, "fig5_heldout_profiles"); C = _memo(c, "fig5_heldout_cells"); rows = []
     for cell in C.itertuples():
         d = P[(P.family == cell.family) & (P.scenario == cell.scenario)]
@@ -1594,9 +1593,9 @@ def fig5_heldout(c):
             dk = d[d.indicator == k]
             if dk.empty: continue
             oth = dk[dk.series == "other family"].value.to_numpy(float); med = float(np.median(oth))
-            dev = (lambda v: 100 * (v / med - 1)) if k == "FE_total" else (lambda v: v - med)
-            base = dict(family=cell.family, scenario=cell.scenario, n_other_families=cell.n_other_families, indicator=k,
-                        unit="%" if k == "FE_total" else "percentage points")
+            dev = lambda v: v - med
+            base = dict(family=cell.family, scenario=cell.scenario, n_other_families=len(oth), indicator=k,   # families with this indicator
+                        unit="percentage points")
             rows += [dict(base, series="other family", deviation=dev(v)) for v in oth]
             rows.append(dict(base, series="synthetic", deviation=dev(float(dk[dk.series == "synthetic"].value.iloc[0]))))
             rows.append(dict(base, series="AR6 truth", deviation=dev(float(dk[dk.series == "AR6 truth"].value.iloc[0]))))
@@ -1632,7 +1631,7 @@ MAIN_TITLES = {   # block -> title row of its table in the workbook
     "fig4_group_metrics":       "Fig. 4c–f. Test-set metrics of the finetuned model for each group.",
     "fig4_reference_lines":     "Fig. 4c–f. Reference levels from AR6 data. The first is the scenario with the most similar description that the same IAM family evaluated in the same region. The second is the output of the other IAM families for the same scenario and region.",
     "fig4_contrast_examples":   "Fig. 4g–j. Training case B, AR6 test case A and synthetic test case A for the four examples that differ in one assumption (EJ yr⁻¹).",
-    "fig5_heldout_deviations":  "Fig. 5a–d. Indicators in 2050 for four held-out combinations of IAM family and scenario, given as deviations from the median of the other IAM families that evaluated the scenario.",
+    "fig5_heldout_deviations":  "Fig. 5a–d. Shares in 2050 for four held-out combinations of IAM family and scenario, given as differences from the median of the other IAM families that evaluated the scenario (percentage points).",
 }
 
 def figure_layout(blocks, titles):

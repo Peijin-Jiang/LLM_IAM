@@ -723,21 +723,22 @@ def fig5():
 
 def _heldout_row(fig, top, bottom, legend_y, letters="abcd"):
     """Four seen-stratum test cells treated as missing IAM family x scenario
-    combinations (ENGAGE). y = deviation from the median of the other families
-    that ran the scenario (percentage points; per cent for total final energy)
-    on a symlog axis (linear within +-1; limit 2.3 x the largest deviation so
-    nothing sits on the frame). Grey bar = the other families' range, ticks =
-    each of them, teal = held-out family's synthetic value, gold hollow = its
-    AR6 truth."""
-    Pf = sheet("fig5_heldout_deviations"); Cl = Pf[["family", "scenario", "n_other_families"]].drop_duplicates()
-    ORDER = ["fossil_unab_share", "ccs_share", "sw_share", "bio_share", "nuc_share", "FE_total", "ind_elec_share", "tr_elec_share", "bld_elec_share"]
-    SHORT = {"fossil_unab_share": "Fossil w/o CCS", "ccs_share": "Fossil w/ CCS", "sw_share": "Wind + solar", "bio_share": "Biomass",
-             "nuc_share": "Nuclear", "FE_total": "Final energy (%)", "ind_elec_share": "Elec. industry", "tr_elec_share": "Elec. transport", "bld_elec_share": "Elec. buildings"}
+    combinations (ENGAGE). y = difference from the median of the other families
+    that ran the scenario (percentage points, linear axis). Indicators: the three
+    groups of primary energy sources of Fig. 3a and the electricity share of final
+    energy in its three sectors. Grey bar = the other families' range, ticks =
+    each of them, teal = target family's synthetic value, gold hollow = its
+    withheld AR6 output."""
+    Pf = sheet("fig5_heldout_deviations"); Cl = Pf[["family", "scenario"]].drop_duplicates()
+    ORDER = ["pe_fossil_unab", "pe_fossil_ccs", "pe_nonfossil", "ind_elec_share", "bld_elec_share", "tr_elec_share"]
+    SHORT = {"pe_fossil_unab": "Fossil w/o CCS", "pe_fossil_ccs": "Fossil w/ CCS", "pe_nonfossil": "Non-fossil",
+             "ind_elec_share": "Industry elec.", "bld_elec_share": "Buildings elec.", "tr_elec_share": "Transport elec."}
     def plain(scen):
         if scen == "EN_NPi2100": return "no carbon budget\nimplemented national policies continued"
         pre, bud, f = re.match(r"EN_(NPi2020|INDCi2030)_(\d+)(f?)", scen).groups()
         return f"{bud} GtCO$_2$ budget\n{'NDCs until 2030' if pre == 'INDCi2030' else 'immediate action'}, {'overshoot allowed' if f else 'no overshoot'}"
-    gsh = fig.add_gridspec(1, 4, left=0.075, right=0.985, top=top, bottom=bottom, wspace=0.30)
+    n_ind = [len([k for k in ORDER if k in set(Pf[(Pf.family == c.family) & (Pf.scenario == c.scenario)].indicator)]) for c in Cl.itertuples()]
+    gsh = fig.add_gridspec(1, 4, left=0.075, right=0.985, top=top, bottom=bottom, wspace=0.34, width_ratios=[n + 6 for n in n_ind])
     axes, ymax = [], 1.0
     for j, c in enumerate(Cl.itertuples()):
         ax = fig.add_subplot(gsh[0, j]); axes.append(ax)
@@ -758,19 +759,22 @@ def _heldout_row(fig, top, bottom, legend_y, letters="abcd"):
         ax.set_xticks(range(len(inds))); ax.set_xticklabels([SHORT[k] + ("*" if k in singles else "") for k in inds], fontsize=5.4, rotation=50, ha="right", rotation_mode="anchor")
         ax.set_xlim(-0.6, len(inds) - 0.4)
         ax.set_title(f"{c.family}\n{plain(c.scenario)}", fontsize=6.0, pad=11, linespacing=1.2)
-        ax.text(0.5, 1.02, f"range of {c.n_other_families} other IAM families", transform=ax.transAxes, ha="center", va="bottom", fontsize=4.9, color=MUTED)
-        if j == 0: ax.set_ylabel("Deviation from the other families'\nmedian in 2050 (pp; % for final energy)", linespacing=1.15)
+        ax.text(0.5, 1.02, f"2050, compared with {int(d.n_other_families.max())} other IAM families", transform=ax.transAxes, ha="center", va="bottom", fontsize=4.9, color=MUTED)
+        n_pe = sum(k in inds for k in ORDER[:3])   # group headers
+        if len(inds) > n_pe:
+            ax.axvline(n_pe - 0.5, color=GRAY_L, lw=0.6, ls=(0, (3, 2)), zorder=0.4)
+            ax.text(n_pe + (len(inds) - n_pe) / 2 - 0.5, 0.985, "Electricity share\nof final energy", transform=ax.get_xaxis_transform(), ha="center", va="top", fontsize=4.7, color=MUTED, linespacing=1.1)
+        ax.text(n_pe / 2 - 0.5, 0.985, "Share of\nprimary energy", transform=ax.get_xaxis_transform(), ha="center", va="top", fontsize=4.7, color=MUTED, linespacing=1.1)
+        if j == 0: ax.set_ylabel("Difference from the median of\nother IAM families (percentage points)", linespacing=1.15)
         plabel(gsh[0, j], letters[j], pad=0.055 if j == 0 else 0.03, fig=fig, yscale=1.4)
-    top_lim = ymax * 2.3
-    for ax in axes:
-        ax.set_yscale("symlog", linthresh=1.0, linscale=0.8); ax.set_ylim(-top_lim, top_lim)
-        ticks = [t for t in (-100, -30, -10, -3, -1, 0, 1, 3, 10, 30, 100) if abs(t) <= top_lim]
-        ax.set_yticks(ticks); ax.set_yticklabels([f"{t:g}" for t in ticks]); ax.yaxis.set_minor_locator(mticker.NullLocator())
-        ax.axhspan(-1, 1, color="#F3F5F7", lw=0, zorder=0)
+    top_lim = 10 * np.ceil(ymax * 1.3 / 10)
+    for j, ax in enumerate(axes):
+        ax.set_ylim(-top_lim, top_lim); ax.set_yticks([-30, -15, 0, 15, 30])
+        if j > 0: ax.set_yticklabels([])
     Hh = [Rectangle((0, 0), 1, 1, color=GRAY_L), plt.Line2D([], [], marker="_", color=GRAY_D, ls="none", ms=6, mew=0.9),
           plt.Line2D([], [], marker="o", color=SYN, ls="none", ms=4.5, mec="white", mew=0.5),
           plt.Line2D([], [], marker="o", markerfacecolor="none", markeredgecolor=AR6_C, ls="none", ms=5, mew=1.1)]
-    L = ["Range of the other IAM families (AR6), 2050", "Individual other family", "Held-out family, synthetic", "Held-out family, AR6 truth"]
+    L = ["Range of the other IAM families, AR6", "Individual other family, AR6", "Target family, synthetic", "Target family, withheld AR6 output"]
     fig.legend(Hh, L, frameon=False, loc="upper center", bbox_to_anchor=(0.5, legend_y), ncol=4, handlelength=1.6, columnspacing=1.4, fontsize=6, handletextpad=0.5)
 
 
