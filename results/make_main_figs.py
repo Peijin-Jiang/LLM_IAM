@@ -728,7 +728,7 @@ def _heldout_row(fig, top, bottom, legend_y, letters="abcd"):
     groups of primary energy sources of Fig. 3a and the electricity share of final
     energy in its three sectors. Grey bar = the other families' range, ticks =
     each of them, teal = target family's synthetic value, gold hollow = its
-    withheld AR6 output."""
+    AR6 output (test set)."""
     Pf = sheet("fig5_heldout_deviations"); Cl = Pf[["family", "scenario"]].drop_duplicates()
     ORDER = ["pe_fossil_unab", "pe_fossil_ccs", "pe_nonfossil", "ind_elec_share", "bld_elec_share", "tr_elec_share"]
     SHORT = {"pe_fossil_unab": "Fossil w/o CCS", "pe_fossil_ccs": "Fossil w/ CCS", "pe_nonfossil": "Non-fossil",
@@ -774,7 +774,7 @@ def _heldout_row(fig, top, bottom, legend_y, letters="abcd"):
     Hh = [Rectangle((0, 0), 1, 1, color=GRAY_L), plt.Line2D([], [], marker="_", color=GRAY_D, ls="none", ms=6, mew=0.9),
           plt.Line2D([], [], marker="o", color=SYN, ls="none", ms=4.5, mec="white", mew=0.5),
           plt.Line2D([], [], marker="o", markerfacecolor="none", markeredgecolor=AR6_C, ls="none", ms=5, mew=1.1)]
-    L = ["Range of the other IAM families, AR6", "Individual other family, AR6", "Target family, synthetic", "Target family, withheld AR6 output"]
+    L = ["Range of the other IAM families, AR6", "Individual other family, AR6", "Target family, synthetic", "Target family, AR6"]
     fig.legend(Hh, L, frameon=False, loc="upper center", bbox_to_anchor=(0.5, legend_y), ncol=4, handlelength=1.6, columnspacing=1.4, fontsize=6, handletextpad=0.5)
 
 
